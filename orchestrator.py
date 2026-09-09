@@ -36,7 +36,7 @@ def _command_version(command):
         return f"unavailable: {exc}"
 
 
-def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path):
+def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_utc):
     inputs = {}
     for label, path in (("project_boundary", aoi_path), ("task_grid", tasks_path), ("geofabrik_pbf", pbf_path)):
         stat = os.stat(path)
@@ -49,7 +49,7 @@ def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path):
     metadata = {
         "qa_buddy_version": QA_BUDDY_VERSION,
         "project_id": os.environ.get("QABOT_PROJECT_ID") or None,
-        "run_started_utc": datetime.now(timezone.utc).isoformat(),
+        "run_started_utc": run_started_utc,
         "validation_engine": "JOSM headless validator",
         "toolchain": {
             "josm_tested_version": JOSM_VERSION,
@@ -146,6 +146,7 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None):
     os.makedirs(WORK_DIR, exist_ok=True)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
+    run_started_utc = datetime.now(timezone.utc).isoformat()
     for path, label in ((pbf_path, "PBF"), (aoi_path, "Project Boundary"), (tasks_path, "Task Grid")):
         if not path or not os.path.isfile(path):
             raise FileNotFoundError(f"{label} file not found: {path}")
@@ -160,7 +161,9 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None):
         raise RuntimeError("Pre-flight validation failed. Fix the selected input files and try again.")
 
     metadata_path = os.path.join(WORK_DIR, "run_metadata.json")
-    write_run_metadata(aoi_path, tasks_path, pbf_path, metadata_path)
+    write_run_metadata(aoi_path, tasks_path, pbf_path, metadata_path, run_started_utc)
+    if output_dir:
+        shutil.copy2(metadata_path, os.path.join(output_dir, "run_metadata.json"))
 
     for src, name in ((aoi_path, "project_aoi.geojson"), (tasks_path, "project_tasks.geojson"), (pbf_path, "region.osm.pbf")):
         dst = os.path.join(WORK_DIR, name)

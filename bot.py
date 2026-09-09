@@ -9,29 +9,25 @@ import time
 import java.lang.Throwable
 from java.lang import Class
 from java.io import FileInputStream, File
-
 from org.openstreetmap.josm.spi.preferences import Config, MemoryPreferences, IBaseDirectories
 
+WORK_DIR = os.environ.get("QABOT_WORK_DIR", "/data/work")
+
 class HeadlessDirs(IBaseDirectories):
-    def getPreferencesDirectory(self, create): return File("C:/JOSM_Headless")
-    def getUserDataDirectory(self, create): return File("C:/JOSM_Headless")
-    def getCacheDirectory(self, create): return File("C:/JOSM_Headless")
+    def getPreferencesDirectory(self, create): return File(WORK_DIR)
+    def getUserDataDirectory(self, create): return File(WORK_DIR)
+    def getCacheDirectory(self, create): return File(WORK_DIR)
 
 Config.setBaseDirectoriesProvider(HeadlessDirs())
 pref = MemoryPreferences()
 Config.setPreferencesInstance(pref)
 
-# ============================================================
-# INITIALIZATION & PROJECTION
-# ============================================================
 from org.openstreetmap.josm.data.projection import Projections, ProjectionRegistry
-
 proj = Projections.getProjectionByCode("EPSG:3857")
 ProjectionRegistry.setProjection(proj)
 print("Projection set: " + str(ProjectionRegistry.getProjection().toString()))
 sys.stdout.flush()
 
-# Full validator preferences
 pref.putBoolean("validator.CrossingWays.test_buildings", True)
 pref.putBoolean("validator.UnclosedWays.test_buildings", True)
 pref.putBoolean("validator.CrossingWays.test_highways", True)
@@ -48,9 +44,8 @@ sys.stdout.flush()
 
 try:
     I18n.init()
-    work_dir = "C:/JOSM_Headless"
+    work_dir = WORK_DIR
 
-    # Download HOT TM MapCSS rules if not already present
     extract_path = work_dir + "/hot_rules"
     if not os.path.exists(extract_path):
         print("Downloading HOT TM MapCSS rules...")
@@ -68,7 +63,6 @@ try:
                 mapcss_file = os.path.join(root, file)
                 break
 
-    # Custom MapCSS rule for oversized buildings
     custom_mapcss_path = work_dir + "/size_rule.mapcss"
     with open(custom_mapcss_path, "w") as f:
         f.write("""
@@ -91,7 +85,6 @@ try:
     sys.stdout.flush()
 
     mapcss_checker = MapCSSTagChecker()
-
     try:
         mapcss_checker.addMapCSS("resource://data/validator/geometry.mapcss")
         print("  -> Built-in JOSM geometry MapCSS rules loaded.")
@@ -101,13 +94,11 @@ try:
     if mapcss_file:
         mapcss_checker.addMapCSS("file:///" + mapcss_file.replace("\\", "/"))
         print("  -> HOT TM MapCSS rules loaded.")
-
     mapcss_checker.addMapCSS("file:///" + custom_mapcss_path.replace("\\", "/"))
     print("  -> Custom oversize MapCSS rule loaded.")
     sys.stdout.flush()
 
     test_list = [TagChecker(), mapcss_checker]
-
     print("Injecting all geometry & tagging validator modules...")
     sys.stdout.flush()
 
@@ -138,7 +129,6 @@ try:
         "org.openstreetmap.josm.data.validation.tests.CrossingWays$Boundaries",
         "org.openstreetmap.josm.data.validation.tests.CrossingWays$SelfCrossing"
     ]
-
     for class_name in target_classes:
         try_load(class_name)
 
@@ -152,15 +142,12 @@ try:
         field = test_instance.getClass().getDeclaredField("waysUsedInRelations")
         field.setAccessible(True)
         field.set(test_instance, ways_in_relations)
-        print("  -> Headless fix applied: waysUsedInRelations populated ("
-              + str(ways_in_relations.size()) + " ways).")
+        print("  -> Headless fix applied: waysUsedInRelations populated (" + str(ways_in_relations.size()) + " ways).")
         sys.stdout.flush()
 
     print("\nStarting validation process...")
     sys.stdout.flush()
-
     from java.util import ArrayList
-
     java_primitives = ArrayList(primitives)
     all_errors = []
 
@@ -169,29 +156,21 @@ try:
         rule_name = test.getClass().getSimpleName()
         if not rule_name or rule_name == "":
             rule_name = test.getClass().getName().split(".")[-1]
-
         print("  [" + str(idx) + "/" + str(total_tests) + "] Running " + rule_name + "...")
         sys.stdout.flush()
-
         t_start = time.time()
         try:
             test.startTest(NullProgressMonitor.INSTANCE)
-
             if rule_name == "UntaggedWay":
                 populate_ways_used_in_relations(test, dataset)
-
             test.visit(java_primitives)
             test.endTest()
-
             errs = test.getErrors()
             found_count = len(errs) if errs else 0
             if errs:
                 all_errors.extend(errs)
-
-            elapsed = round(time.time() - t_start, 2)
-            print("      Finished in " + str(elapsed) + "s -> " + str(found_count) + " issue(s) found.")
+            print("      Finished in " + str(round(time.time() - t_start, 2)) + "s -> " + str(found_count) + " issue(s) found.")
             sys.stdout.flush()
-
         except java.lang.Throwable as t:
             print("  [!] Skipping unstable rule (" + rule_name + "): " + str(t.getMessage()))
             sys.stdout.flush()
@@ -199,90 +178,46 @@ try:
             print("  [!] Skipping unstable rule (" + rule_name + "): " + str(e))
             sys.stdout.flush()
 
-    # ============================================================
-    # OUTPUT GEOJSON FEATURECOLLECTION
-    # ============================================================
-    geojson_output = {
-        "type": "FeatureCollection",
-        "features": []
-    }
-
+    geojson_output = {"type": "FeatureCollection", "features": []}
     for err in all_errors:
         base_message = err.getMessage()
         severity = err.getSeverity().toString()
         test_name = err.getTester().getName()
-
         try:
             description = err.getDescription()
         except Exception:
             description = None
-
-        if description and description != base_message:
-            message = base_message + " - " + description
-        else:
-            message = base_message
-
+        message = base_message + " - " + description if description and description != base_message else base_message
         involved_objects = list(err.getPrimitives())
-
-        if involved_objects and len(involved_objects) > 0:
-            first_elem = involved_objects[0]
-            elem_type = first_elem.getType().toString().lower()
-            elem_id = first_elem.getUniqueId()
-            obj_id_str = elem_type + "/" + str(elem_id)
-
-            try:
-                coor = None
-                if elem_type == "node":
-                    coor = first_elem.getCoor()
-                elif elem_type == "way" and first_elem.getNodesCount() > 0:
-                    coor = first_elem.getNode(0).getCoor()
-
-                if coor:
-                    lat = coor.lat()
-                    lon = coor.lon()
-
-                    josm_url = ""
-                    if elem_id > 0:
-                        buf = 0.0003
-                        zoom_left = lon - buf
-                        zoom_right = lon + buf
-                        zoom_top = lat + buf
-                        zoom_bottom = lat - buf
-                        josm_url = (
-                            "http://127.0.0.1:8111/zoom"
-                            "?left=" + str(zoom_left) +
-                            "&right=" + str(zoom_right) +
-                            "&top=" + str(zoom_top) +
-                            "&bottom=" + str(zoom_bottom) +
-                            "&select=" + elem_type + str(elem_id)
-                        )
-
-                    feature = {
-                        "type": "Feature",
-                        "geometry": {
-                            "type": "Point",
-                            "coordinates": [lon, lat]
-                        },
-                        "properties": {
-                            "rule": test_name,
-                            "message": message,
-                            "severity": severity,
-                            "object_id": obj_id_str,
-                            "josm_remote_url": josm_url
-                        }
-                    }
-                    geojson_output["features"].append(feature)
-            except Exception:
-                pass
+        if not involved_objects:
+            continue
+        first_elem = involved_objects[0]
+        elem_type = first_elem.getType().toString().lower()
+        elem_id = first_elem.getUniqueId()
+        obj_id_str = elem_type + "/" + str(elem_id)
+        try:
+            coor = first_elem.getCoor() if elem_type == "node" else (first_elem.getNode(0).getCoor() if elem_type == "way" and first_elem.getNodesCount() > 0 else None)
+            if not coor:
+                continue
+            lat, lon = coor.lat(), coor.lon()
+            josm_url = ""
+            if elem_id > 0:
+                buf = 0.0003
+                josm_url = ("http://127.0.0.1:8111/zoom?left=" + str(lon - buf) + "&right=" + str(lon + buf) + "&top=" + str(lat + buf) + "&bottom=" + str(lat - buf) + "&select=" + elem_type + str(elem_id))
+            geojson_output["features"].append({
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                "properties": {"rule": test_name, "message": message, "severity": severity, "object_id": obj_id_str, "josm_remote_url": josm_url}
+            })
+        except Exception:
+            pass
 
     geojson_path = work_dir + "/qa_errors.geojson"
     with open(geojson_path, "w") as f:
         json.dump(geojson_output, f, indent=2)
-
     print("\nDone! Found " + str(len(geojson_output["features"])) + " issue(s). Saved to: " + geojson_path)
     sys.stdout.flush()
     sys.exit(0)
-
-except Exception as e:
+except Exception:
     traceback.print_exc()
     sys.exit(1)

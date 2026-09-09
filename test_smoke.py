@@ -1,0 +1,54 @@
+import json
+import tempfile
+from pathlib import Path
+
+from orchestrator import aggregate_errors_to_tasks
+from report import generate_report
+
+
+def feature(geometry, properties=None):
+    return {"type": "Feature", "properties": properties or {}, "geometry": geometry}
+
+
+def test_task_aggregation_and_report():
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        tasks = tmp_path / "tasks.geojson"
+        errors = tmp_path / "qa_errors.geojson"
+        report = tmp_path / "report.html"
+        map_path = tmp_path / "map.html"
+        tasks_data = {"type": "FeatureCollection", "features": [feature({"type": "Polygon", "coordinates": [[[0,0],[2,0],[2,2],[0,2],[0,0]]]}, {"taskId": 56})]}
+        errors_data = {"type": "FeatureCollection", "features": [
+            feature({"type":"Point","coordinates":[0.5,0.5]}, {"severity":"Errors","object_id":"way/1","rule":"MapCSS"}),
+            feature({"type":"Point","coordinates":[1,1]}, {"severity":"Warnings","object_id":"way/1","rule":"MapCSS"}),
+            feature({"type":"Point","coordinates":[1.5,1.5]}, {"severity":"Warnings","object_id":"node/2","rule":"TagChecker"}),
+        ]}
+        tasks.write_text(json.dumps(tasks_data), encoding="utf-8")
+        errors.write_text(json.dumps(errors_data), encoding="utf-8")
+
+        import orchestrator
+        original_work_dir = orchestrator.WORK_DIR
+        orchestrator.WORK_DIR = str(tmp_path)
+        try:
+            summary = aggregate_errors_to_tasks(str(tasks), str(errors))
+            result = json.loads(Path(summary).read_text(encoding="utf-8"))
+            props = result["features"][0]["properties"]
+            assert props["qa_finding_count"] == 3
+            assert props["qa_unique_osm_object_count"] == 2
+            assert props["qa_rules_involved"] == ["MapCSS", "TagChecker"]
+            assert props["qa_error_count"] == 1
+            assert props["qa_warning_count"] == 2
+            generate_report(str(errors), str(summary), str(report), str(map_path))
+            html = report.read_text(encoding="utf-8")
+            map_html = map_path.read_text(encoding="utf-8")
+            assert "Errors:</b> 1" in html
+            assert "Warnings:</b> 2" in html
+            assert "taskId" in map_html
+            assert "Unique OSM objects:" in map_html
+        finally:
+            orchestrator.WORK_DIR = original_work_dir
+
+
+if __name__ == "__main__":
+    test_task_aggregation_and_report()
+    print("Smoke tests passed.")

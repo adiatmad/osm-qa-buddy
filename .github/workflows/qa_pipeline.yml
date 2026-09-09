@@ -12,40 +12,42 @@ on:
         required: true
         type: string
   repository_dispatch:
-    types: [project_100_validated] # Webhook trigger for developers
+    types: [project_100_validated]
 
 jobs:
   qa_audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Fetch Project GeoJSONs
         run: |
           PROJ_ID="${{ github.event.inputs.project_id || github.event.client_payload.project_id }}"
-          curl -s "https://tasking-manager-api.hotosm.org/api/v2/projects/$PROJ_ID/queries/aoi/" -o project_aoi.geojson
-          curl -s "https://tasking-manager-api.hotosm.org/api/v2/projects/$PROJ_ID/tasks/" -o project_tasks.geojson
-
+          curl -fsSL "https://tasking-manager-api.hotosm.org/api/v2/projects/$PROJ_ID/queries/aoi/" -o project_aoi.geojson
+          curl -fsSL "https://tasking-manager-api.hotosm.org/api/v2/projects/$PROJ_ID/tasks/" -o project_tasks.geojson
       - name: Download Geofabrik PBF
         run: |
           PBF_URL="${{ github.event.inputs.geofabrik_url || github.event.client_payload.geofabrik_url }}"
           wget -q "$PBF_URL" -O region.osm.pbf
-
       - name: Build and Run QA Container
         run: |
+          mkdir -p qa_results
           docker build -t qabot .
-          docker run --rm -v ${{ github.workspace }}:/data qabot region.osm.pbf project_aoi.geojson project_tasks.geojson
-
+          docker run --rm -v "${{ github.workspace }}:/data" qabot /data/region.osm.pbf /data/project_aoi.geojson /data/project_tasks.geojson /data/qa_results
       - name: Generate Executive Summary
         run: |
-          echo "## 3rd Pass Validation Results 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "**Project ID:** ${{ github.event.inputs.project_id || github.event.client_payload.project_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "Validation completed successfully. Download the zip artifact to view the GeoJSON in JOSM." >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload Zip Artifacts
+          PROJ_ID="${{ github.event.inputs.project_id || github.event.client_payload.project_id }}"
+          echo "## 3rd Pass Validation Results 🚀" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Project ID:** $PROJ_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Report:** [Open report](qa_results/report.html)" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Interactive map:** [Open map](qa_results/map.html)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload QA artifacts
         uses: actions/upload-artifact@v4
         with:
           name: QA_Results_Project_${{ github.event.inputs.project_id || github.event.client_payload.project_id }}
           path: |
-            qa_errors.geojson
-            task_grid_qa_summary.geojson
+            qa_results/qa_errors.geojson
+            qa_results/task_grid_qa_summary.geojson
+            qa_results/report.html
+            qa_results/map.html
+            qa_results/qa_run.log
+            qa_results/sample.osm

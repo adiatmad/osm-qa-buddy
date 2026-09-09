@@ -1,7 +1,18 @@
 FROM eclipse-temurin:17-jre-jammy
-RUN apt-get update && apt-get install -y python3 python3-pip osmium-tool && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-pip osmium-tool wget \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
-RUN wget -q https://josm.openstreetmap.de/josm-tested.jar -O josm-tested.jar && \
-    wget -q https://repo1.maven.org/maven2/org/python/jython-standalone/2.7.3/jython-standalone-2.7.3.jar -O jython.jar
-COPY bot.py orchestrator.py ./
-ENTRYPOINT ["python3", "orchestrator.py"]
+
+RUN python3 -m pip install --no-cache-dir shapely
+RUN wget -q https://josm.openstreetmap.de/josm-tested.jar -O /app/josm-tested.jar
+RUN wget -q https://repo1.maven.org/maven2/org/python/jython-standalone/2.7.3/jython-standalone-2.7.3.jar -O /app/jython.jar
+
+COPY bot.py orchestrator.py preflight.py report.py /app/
+
+ENV QABOT_WORK_DIR=/data/work
+RUN mkdir -p /data/work
+
+ENTRYPOINT ["python3", "/app/orchestrator.py"]

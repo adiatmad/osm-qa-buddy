@@ -17,14 +17,25 @@ def test_task_aggregation_and_report():
         errors = tmp_path / "qa_errors.geojson"
         report = tmp_path / "report.html"
         map_path = tmp_path / "map.html"
+        metadata = tmp_path / "run_metadata.json"
         tasks_data = {"type": "FeatureCollection", "features": [feature({"type": "Polygon", "coordinates": [[[0,0],[2,0],[2,2],[0,2],[0,0]]]}, {"taskId": 56})]}
         errors_data = {"type": "FeatureCollection", "features": [
             feature({"type":"Point","coordinates":[0.5,0.5]}, {"severity":"Errors","object_id":"way/1","rule":"MapCSS"}),
             feature({"type":"Point","coordinates":[1,1]}, {"severity":"Warnings","object_id":"way/1","rule":"MapCSS"}),
             feature({"type":"Point","coordinates":[1.5,1.5]}, {"severity":"Warnings","object_id":"node/2","rule":"TagChecker"}),
         ]}
+        metadata_data = {
+            "qa_buddy_version": "0.1.0",
+            "project_id": "63564",
+            "run_started_utc": "2026-09-09T00:00:00+00:00",
+            "validation_engine": "JOSM headless validator",
+            "toolchain": {"josm_tested_version": "19613", "jython_version": "2.7.3", "java_runtime": "OpenJDK", "osmium_version": "osmium-tool"},
+            "inputs": {"project_boundary": {"filename": "project-aoi.geojson", "size_bytes": 123, "sha256": "abc123"}},
+            "human_review_required": True,
+        }
         tasks.write_text(json.dumps(tasks_data), encoding="utf-8")
         errors.write_text(json.dumps(errors_data), encoding="utf-8")
+        metadata.write_text(json.dumps(metadata_data), encoding="utf-8")
 
         import orchestrator
         original_work_dir = orchestrator.WORK_DIR
@@ -38,11 +49,15 @@ def test_task_aggregation_and_report():
             assert props["qa_rules_involved"] == ["MapCSS", "TagChecker"]
             assert props["qa_error_count"] == 1
             assert props["qa_warning_count"] == 2
-            generate_report(str(errors), str(summary), str(report), str(map_path))
+            generate_report(str(errors), str(summary), str(report), str(map_path), str(metadata))
             html = report.read_text(encoding="utf-8")
             map_html = map_path.read_text(encoding="utf-8")
             assert "Errors:</b> 1" in html
             assert "Warnings:</b> 2" in html
+            assert "Human review required" in html
+            assert "JOSM tested version: 19613" in html
+            assert "63564" in html
+            assert "abc123" in html
             assert "taskId" in map_html
             assert "Unique OSM objects:" in map_html
         finally:

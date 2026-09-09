@@ -12,13 +12,13 @@ on:
         required: true
         type: string
   repository_dispatch:
-    types: [project_100_validated] # The Webhook trigger for developers
+    types: [project_100_validated] # Webhook trigger for developers
 
 jobs:
   qa_audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Fetch Project GeoJSONs
         run: |
@@ -43,7 +43,7 @@ jobs:
           echo "Validation completed successfully. Download the zip artifact to view the GeoJSON in JOSM." >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Zip Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: QA_Results_Project_${{ github.event.inputs.project_id || github.event.client_payload.project_id }}
           path: |

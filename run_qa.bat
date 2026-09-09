@@ -24,7 +24,7 @@ if errorlevel 1 (
 )
 
 echo Building Docker QA image...
-docker build -t qabot
+docker build -t qabot .
 if errorlevel 1 (
     echo.
     echo Docker image build failed.

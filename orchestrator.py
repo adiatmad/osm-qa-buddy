@@ -1,9 +1,11 @@
 import argparse
+import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from shapely.geometry import Point, shape
@@ -12,6 +14,63 @@ from preflight import normalize_aoi_for_osmium, validate_inputs
 from report import generate_report
 
 WORK_DIR = os.environ.get("QABOT_WORK_DIR", "/data/work")
+QA_BUDDY_VERSION = "0.1.0"
+JOSM_VERSION = "19613"
+JYTHON_VERSION = "2.7.3"
+
+
+def _sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _command_version(command):
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        output = (result.stdout or result.stderr).strip()
+        return output.splitlines()[0] if output else "unknown"
+    except Exception as exc:
+        return f"unavailable: {exc}"
+
+
+def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path):
+    inputs = {}
+    for label, path in (("project_boundary", aoi_path), ("task_grid", tasks_path), ("geofabrik_pbf", pbf_path)):
+        stat = os.stat(path)
+        inputs[label] = {
+            "filename": os.path.basename(path),
+            "size_bytes": stat.st_size,
+            "sha256": _sha256(path),
+        }
+
+    metadata = {
+        "qa_buddy_version": QA_BUDDY_VERSION,
+        "project_id": os.environ.get("QABOT_PROJECT_ID") or None,
+        "run_started_utc": datetime.now(timezone.utc).isoformat(),
+        "validation_engine": "JOSM headless validator",
+        "toolchain": {
+            "josm_tested_version": JOSM_VERSION,
+            "jython_version": JYTHON_VERSION,
+            "java_runtime": _command_version(["java", "-version"]),
+            "osmium_version": _command_version(["osmium", "--version"]),
+        },
+        "inputs": inputs,
+        "validation_scope": [
+            "HOT TM project boundary preflight",
+            "HOT TM task grid preflight",
+            "Geofabrik regional PBF preflight",
+            "OSM data clipped to project boundary",
+            "JOSM validator checks",
+            "task-level finding aggregation",
+        ],
+        "human_review_required": True,
+    }
+    Path(output_path).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    print(f"  -> Run metadata saved to: {output_path}")
+    return output_path
 
 
 def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
@@ -29,7 +88,7 @@ def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
 
 
 def run_josm_qa_bot():
-    print("[*] Executing JOSM Headless QA Bot (bot.py)...")
+    print(f"[*] Executing JOSM {JOSM_VERSION} Headless QA Bot (bot.py)...")
     cmd = ["java", "-Xmx10g", "-cp", "/app/josm-tested.jar:/app/jython.jar", "org.python.util.jython", "/app/bot.py"]
     result = subprocess.run(cmd, cwd=WORK_DIR)
     if result.returncode != 0:
@@ -100,6 +159,9 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None):
     if not preflight["ok"]:
         raise RuntimeError("Pre-flight validation failed. Fix the selected input files and try again.")
 
+    metadata_path = os.path.join(WORK_DIR, "run_metadata.json")
+    write_run_metadata(aoi_path, tasks_path, pbf_path, metadata_path)
+
     for src, name in ((aoi_path, "project_aoi.geojson"), (tasks_path, "project_tasks.geojson"), (pbf_path, "region.osm.pbf")):
         dst = os.path.join(WORK_DIR, name)
         if os.path.abspath(src) != os.path.abspath(dst):
@@ -114,16 +176,17 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None):
     summary = aggregate_errors_to_tasks(tasks, errors)
     report_path = os.path.join(WORK_DIR, "report.html")
     map_path = os.path.join(WORK_DIR, "map.html")
-    generate_report(errors, summary, report_path, map_path)
+    generate_report(errors, summary, report_path, map_path, metadata_path)
 
     if output_dir:
-        for name in ("qa_errors.geojson", "task_grid_qa_summary.geojson", "sample.osm", "report.html", "map.html"):
+        for name in ("qa_errors.geojson", "task_grid_qa_summary.geojson", "sample.osm", "report.html", "map.html", "run_metadata.json"):
             src = os.path.join(WORK_DIR, name)
             if os.path.exists(src):
                 shutil.copy2(src, os.path.join(output_dir, name))
 
     print(f"[+] REPORT: {report_path}")
     print(f"[+] MAP: {map_path}")
+    print(f"[+] METADATA: {metadata_path}")
     print("[+] PIPELINE SUCCEEDED")
 
 

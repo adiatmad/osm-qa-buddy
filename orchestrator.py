@@ -120,8 +120,22 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     for task_feat in tasks_data.get("features", []):
         task_poly = shape(task_feat["geometry"])
         findings = [error for error in error_points if task_poly.covers(error["point"])]
-        error_count = sum(1 for finding in findings if str(finding["severity"]).upper() == "ERROR")
-        warning_count = sum(1 for finding in findings if str(finding["severity"]).upper() in {"WARNING", "WARN", "WARNINGS"})
+        def normalize_severity(value):
+            value = str(value or "UNKNOWN").upper()
+            if value in {"ERROR", "ERRORS"}:
+                return "ERROR"
+            if value in {"WARNING", "WARN", "WARNINGS"}:
+                return "WARNING"
+            return value
+
+        error_count = sum(
+            1 for finding in findings
+            if normalize_severity(finding["severity"]) == "ERROR"
+        )
+        warning_count = sum(
+            1 for finding in findings
+            if normalize_severity(finding["severity"]) == "WARNING"
+        )
         unknown_count = len(findings) - error_count - warning_count
         unique_objects = {finding["object_id"] for finding in findings if finding["object_id"]}
         rules = {finding["rule"] for finding in findings if finding["rule"]}

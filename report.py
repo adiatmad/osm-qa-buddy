@@ -93,7 +93,18 @@ def generate_report(errors_path, tasks_path, report_path, map_path, metadata_pat
     errors = _load(errors_path); tasks = _load(tasks_path)
     metadata = _load(metadata_path) if metadata_path and Path(metadata_path).exists() else {}
     error_features = errors.get("features", []); task_features = tasks.get("features", [])
-    severity_counts = Counter(str(f.get("properties", {}).get("severity", "UNKNOWN")).upper() for f in error_features)
+    def normalize_severity(value):
+        value = str(value or "UNKNOWN").upper()
+        if value in {"ERROR", "ERRORS"}:
+            return "ERROR"
+        if value in {"WARNING", "WARN", "WARNINGS"}:
+            return "WARNING"
+        return value
+
+    severity_counts = Counter(
+        normalize_severity(f.get("properties", {}).get("severity", "UNKNOWN"))
+        for f in error_features
+    )
     rule_counts = Counter(f.get("properties", {}).get("rule", "Unknown") for f in error_features)
     issueful_tasks = sum(1 for f in task_features if (f.get("properties", {}).get("qa_finding_count") or f.get("properties", {}).get("qa_total_issues") or 0) > 0)
     unique_objects = sum((f.get("properties", {}).get("qa_unique_osm_object_count") or 0) for f in task_features)

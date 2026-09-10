@@ -45,10 +45,12 @@ def _resolve_ram_gb():
         ram_gb = int(configured)
     except ValueError as exc:
         raise RuntimeError("QABOT_JAVA_XMX_GB must be a whole number of GB.") from exc
-    ok, message = validate_ram_gb(ram_gb)
-    if not ok:
-        raise RuntimeError(message)
-    return ram_gb, "manual"
+    if ram_gb < 2 or ram_gb > 16:
+        raise RuntimeError("QABOT_JAVA_XMX_GB must be between 2 and 16 GB.")
+    ram_mode = os.environ.get("QABOT_JAVA_XMX_MODE", "manual").strip().lower() or "manual"
+    if ram_mode not in {"automatic", "manual"}:
+        raise RuntimeError("QABOT_JAVA_XMX_MODE must be automatic or manual.")
+    return ram_gb, ram_mode
 
 
 def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_utc):

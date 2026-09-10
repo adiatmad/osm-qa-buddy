@@ -166,7 +166,7 @@ class App(tk.Tk):
             for source, target in ((self.aoi_path.get(), "/data/input/project_aoi.geojson"), (self.tasks_path.get(), "/data/input/project_tasks.geojson"), (self.pbf_path.get(), "/data/input/region.osm.pbf")):
                 mounts += ["--mount", f"type=bind,source={os.path.abspath(source)},target={target},readonly"]
             mounts += ["--mount", f"type=bind,source={os.path.abspath(output_dir)},target=/data/output"]
-            command = ["docker", "run", "--rm", *mounts, "qabot", "/data/input/region.osm.pbf", "/data/input/project_aoi.geojson", "/data/input/project_tasks.geojson", "/data/output"]
+            command = ["docker", "run", "--rm", *mounts, "-e", f"QABOT_PROJECT_ID={self.project_id.get().strip()}", "qabot", "/data/input/region.osm.pbf", "/data/input/project_aoi.geojson", "/data/input/project_tasks.geojson", "/data/output"]
             self.after(0, lambda: self._append_log("\nDOCKER / QA LIVE LOG\n" + "=" * 80 + "\n"))
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir)
             log_lines = []

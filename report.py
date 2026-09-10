@@ -57,7 +57,10 @@ const tasks = {json.dumps(tasks, ensure_ascii=False)};
 const map = L.map('map').setView({json.dumps(center)}, {zoom});
 L.tileLayer('{TILES}', {{maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'}}).addTo(map);
 function taskStyle(feature) {{
-  const n = Number(feature.properties?.qa_total_issues || 0);
+  const p = feature.properties || {{}};
+  const status = String(p.qa_task_status || p.taskStatus || '').toUpperCase();
+  if (status === 'BADIMAGERY') return {{color:'#6a1b9a', weight:2, fillOpacity:0.55, fillColor:'#ab47bc'}};
+  const n = Number(p.qa_total_issues || 0);
   return {{color:'#333', weight:1, fillOpacity:0.45, fillColor:n===0?'#2ca25f':n<5?'#fee08b':n<10?'#fdae61':'#d73027'}};
 }}
 const taskLayer = L.geoJSON(tasks, {{
@@ -65,10 +68,18 @@ const taskLayer = L.geoJSON(tasks, {{
   onEachFeature: (feature, layer) => {{
     const p = feature.properties || {{}};
     const id = p.taskId ?? p.task_id ?? p.id ?? p.uuid ?? 'Unknown';
+    const status = String(p.qa_task_status || p.taskStatus || 'UNKNOWN').toUpperCase();
     const findings = Number(p.qa_finding_count || p.qa_total_issues || 0);
+    const uniqueFindings = Number(p.qa_unique_finding_count || findings);
     const objects = Number(p.qa_unique_osm_object_count || 0);
     const rules = Array.isArray(p.qa_rules_involved) ? p.qa_rules_involved.join(', ') : (p.qa_rules_involved || 'None');
-    layer.bindPopup('<b>Task:</b> '+id+'<br><b>Findings:</b> '+findings+'<br><b>Unique OSM objects:</b> '+objects+'<br><b>Rules:</b> '+escapeHtml(rules)+'<br><b>Errors:</b> '+(p.qa_error_count||0)+'<br><b>Warnings:</b> '+(p.qa_warning_count||0));
+    let statusNote = '';
+    if (status === 'BADIMAGERY') {{
+      statusNote = findings > 0
+        ? '<br><b>Action:</b> Review the imagery first, then review '+findings+' QA finding(s) for this task.'
+        : '<br><b>Action:</b> Please review the imagery and confirm whether the task can reasonably be mapped.';
+    }}
+    layer.bindPopup('<b>Task:</b> '+id+'<br><b>Status:</b> '+escapeHtml(status)+'<br><b>Findings:</b> '+findings+'<br><b>Unique findings:</b> '+uniqueFindings+'<br><b>Unique OSM objects:</b> '+objects+'<br><b>Rules:</b> '+escapeHtml(rules)+'<br><b>Errors:</b> '+(p.qa_error_count||0)+'<br><b>Warnings:</b> '+(p.qa_warning_count||0)+statusNote);
   }}
 }}).addTo(map);
 const errorLayer = L.geoJSON(errors, {{
@@ -81,7 +92,7 @@ const errorLayer = L.geoJSON(errors, {{
 }}).addTo(map);
 function escapeHtml(value) {{ const d=document.createElement('div'); d.textContent=value; return d.innerHTML; }}
 const legend = L.control({{position:'topright'}});
-legend.onAdd = function() {{ const div=L.DomUtil.create('div','legend'); div.innerHTML='<b>Task findings</b><br><span class="swatch" style="background:#2ca25f"></span>0<br><span class="swatch" style="background:#fee08b"></span>1–4<br><span class="swatch" style="background:#fdae61"></span>5–9<br><span class="swatch" style="background:#d73027"></span>10+'; return div; }};
+legend.onAdd = function() {{ const div=L.DomUtil.create('div','legend'); div.innerHTML='<b>Task status / findings</b><br><span class="swatch" style="background:#ab47bc"></span>BADIMAGERY<br><span class="swatch" style="background:#2ca25f"></span>0 findings<br><span class="swatch" style="background:#fee08b"></span>1–4<br><span class="swatch" style="background:#fdae61"></span>5–9<br><span class="swatch" style="background:#d73027"></span>10+'; return div; }};
 legend.addTo(map);
 L.control.layers(null, {{'Task grid': taskLayer, 'QA findings': errorLayer}}).addTo(map);
 if (taskLayer.getBounds().isValid()) map.fitBounds(taskLayer.getBounds(), {{padding:[20,20]}});
@@ -89,24 +100,90 @@ if (taskLayer.getBounds().isValid()) map.fitBounds(taskLayer.getBounds(), {{padd
     Path(output_path).write_text(html, encoding="utf-8")
 
 
-def generate_report(errors_path, tasks_path, report_path, map_path):
+def _normalize_severity(value):
+    value = str(value or "UNKNOWN").upper()
+    if value in {"ERROR", "ERRORS"}:
+        return "ERROR"
+    if value in {"WARNING", "WARN", "WARNINGS"}:
+        return "WARNING"
+    return value
+
+
+def _task_id(props):
+    return props.get("taskId") or props.get("task_id") or props.get("id") or props.get("uuid") or "Unknown"
+
+
+def _task_action(props):
+    status = str(props.get("qa_task_status") or props.get("taskStatus") or "UNKNOWN").upper()
+    findings = int(props.get("qa_finding_count") or props.get("qa_total_issues") or 0)
+    if status == "BADIMAGERY":
+        if findings:
+            return f"Review imagery first, then review {findings} QA finding(s)."
+        return "Review imagery and confirm whether the task can reasonably be mapped."
+    if findings:
+        return f"Review {findings} QA finding(s) in this task."
+    return "No JOSM findings detected."
+
+
+def generate_report(errors_path, tasks_path, report_path, map_path, metadata_path=None):
     errors = _load(errors_path); tasks = _load(tasks_path)
+    metadata = _load(metadata_path) if metadata_path and Path(metadata_path).exists() else {}
     error_features = errors.get("features", []); task_features = tasks.get("features", [])
-    severity_counts = Counter(str(f.get("properties", {}).get("severity", "UNKNOWN")).upper() for f in error_features)
+    severity_counts = Counter(
+        _normalize_severity(f.get("properties", {}).get("severity", "UNKNOWN"))
+        for f in error_features
+    )
     rule_counts = Counter(f.get("properties", {}).get("rule", "Unknown") for f in error_features)
     issueful_tasks = sum(1 for f in task_features if (f.get("properties", {}).get("qa_finding_count") or f.get("properties", {}).get("qa_total_issues") or 0) > 0)
-    total_findings = sum((f.get("properties", {}).get("qa_finding_count") or f.get("properties", {}).get("qa_total_issues") or 0) for f in task_features)
     unique_objects = sum((f.get("properties", {}).get("qa_unique_osm_object_count") or 0) for f in task_features)
+    raw_finding_count = len(error_features)
+    unique_finding_count = sum((f.get("properties", {}).get("qa_unique_finding_count") or f.get("properties", {}).get("qa_finding_count") or 0) for f in task_features)
+    duplicate_finding_count = raw_finding_count - unique_finding_count
+    badimagery_tasks = [
+        f for f in task_features
+        if str(f.get("properties", {}).get("qa_task_status") or f.get("properties", {}).get("taskStatus") or "").upper() == "BADIMAGERY"
+    ]
+    review_tasks = [
+        f for f in task_features
+        if (f.get("properties", {}).get("qa_finding_count") or f.get("properties", {}).get("qa_total_issues") or 0) > 0
+        or str(f.get("properties", {}).get("qa_task_status") or f.get("properties", {}).get("taskStatus") or "").upper() == "BADIMAGERY"
+    ]
+    review_tasks.sort(key=lambda f: (str(f.get("properties", {}).get("qa_task_status") or f.get("properties", {}).get("taskStatus") or "").upper() != "BADIMAGERY", -(f.get("properties", {}).get("qa_finding_count") or f.get("properties", {}).get("qa_total_issues") or 0), str(_task_id(f.get("properties", {})))))
+    badimagery_count = len(badimagery_tasks)
+    badimagery_rows = "\n".join(
+        f"<tr><td>{escape(str(_task_id(f.get('properties', {}))))}</td><td><b>BADIMAGERY</b></td><td>{escape(_task_action(f.get('properties', {})))}</td></tr>"
+        for f in badimagery_tasks
+    )
+    review_rows = "\n".join(
+        f"<tr><td>{escape(str(_task_id(p)))}</td><td>{escape(str(p.get('qa_task_status') or p.get('taskStatus') or 'UNKNOWN'))}</td><td>{p.get('qa_finding_count') or p.get('qa_total_issues') or 0}</td><td>{p.get('qa_unique_finding_count') or p.get('qa_finding_count') or p.get('qa_total_issues') or 0}</td><td>{p.get('qa_unique_osm_object_count') or 0}</td><td>{escape(', '.join(p.get('qa_rules_involved', [])) if isinstance(p.get('qa_rules_involved'), list) else str(p.get('qa_rules_involved') or 'None'))}</td><td>{escape(_task_action(p))}</td></tr>"
+        for f in review_tasks
+        for p in [f.get("properties", {})]
+    )
     rows = "\n".join(f"<tr><td>{escape(rule)}</td><td>{count}</td></tr>" for rule, count in rule_counts.most_common()) or '<tr><td colspan="2">No findings</td></tr>'
+    toolchain = metadata.get("toolchain", {})
+    inputs = metadata.get("inputs", {})
+    input_rows = "".join(
+        f"<tr><td>{escape(label.replace('_', ' ').title())}</td><td>{escape(data.get('filename', ''))}</td><td>{data.get('size_bytes', 0):,}</td><td><code>{escape(data.get('sha256', ''))}</code></td></tr>"
+        for label, data in inputs.items()
+    )
+    badimagery_section = f'''<div class="warning"><b>⚠️ {badimagery_count} task{'s' if badimagery_count != 1 else ''} marked BADIMAGERY.</b> This is a Tasking Manager task status, not a JOSM QA finding. Review imagery first. If a BADIMAGERY task also has QA findings, those findings are shown separately below.</div>
+<h2>BADIMAGERY tasks</h2><table><thead><tr><th>Task</th><th>Status</th><th>Action</th></tr></thead><tbody>{badimagery_rows}</tbody></table>''' if badimagery_count else ''
+    review_section = f'''<h2>Tasks requiring review</h2><p class="muted">This is the PM-oriented view: tasks with JOSM findings or a BADIMAGERY status. A task can appear here because of either signal, or both.</p><table><thead><tr><th>Task</th><th>Status</th><th>Raw findings</th><th>Unique findings</th><th>Unique OSM objects</th><th>Rules</th><th>Action</th></tr></thead><tbody>{review_rows or '<tr><td colspan="7">No tasks require review based on these signals.</td></tr>'}</tbody></table>'''
+    duplicate_note = f'''<p class="muted">The raw QA output contains <b>{raw_finding_count}</b> finding records. <b>{unique_finding_count}</b> are unique finding instances by exact match of severity, rule, message, OSM object, and location; <b>{duplicate_finding_count}</b> are exact duplicates. Raw findings are preserved unchanged.</p>'''
     report = f'''<!doctype html>
 <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OSM QA Buddy Report</title>
-<style>body{{font:15px Segoe UI,Arial,sans-serif;max-width:1100px;margin:0 auto;padding:28px;background:#f6f7f9;color:#202124}} h1{{margin-bottom:4px}} .muted{{color:#666}} .cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}} .card{{background:white;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.1)}} .value{{font-size:28px;font-weight:700}} table{{width:100%;border-collapse:collapse;background:white}} th,td{{padding:10px;border-bottom:1px solid #ddd;text-align:left}} a.button{{display:inline-block;background:#333;color:white;text-decoration:none;padding:10px 14px;border-radius:7px;margin:10px 0}} .note{{background:white;border-left:4px solid #666;padding:12px;margin:16px 0}}</style>
+<style>body{{font:15px Segoe UI,Arial,sans-serif;max-width:1100px;margin:0 auto;padding:28px;background:#f6f7f9;color:#202124}} h1{{margin-bottom:4px}} .muted{{color:#666}} .cards{{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:20px 0}} .card{{background:white;border-radius:10px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.1)}} .value{{font-size:28px;font-weight:700}} table{{width:100%;border-collapse:collapse;background:white}} th,td{{padding:10px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}} a.button{{display:inline-block;background:#333;color:white;text-decoration:none;padding:10px 14px;border-radius:7px;margin:10px 0}} .note{{background:white;border-left:4px solid #666;padding:12px;margin:16px 0}} .warning{{background:#fff8e1;border-left:4px solid #b7791f;padding:12px;margin:16px 0}} code{{word-break:break-all}}</style>
 </head><body><h1>OSM QA Buddy — 3rd Pass Validation</h1><div class="muted">Generated automatically from the JOSM QA results.</div>
-<div class="cards"><div class="card"><div class="muted">Tasks</div><div class="value">{len(task_features)}</div></div><div class="card"><div class="muted">Tasks with findings</div><div class="value">{issueful_tasks}</div></div><div class="card"><div class="muted">QA findings</div><div class="value">{len(error_features)}</div></div><div class="card"><div class="muted">Unique OSM objects by task</div><div class="value">{unique_objects}</div></div></div>
+<div class="warning"><b>Human review required.</b> QA Buddy identifies potential quality issues for review. A finding is not, by itself, proof that the OSM mapping is incorrect.</div>
+<div class="cards"><div class="card"><div class="muted">Tasks</div><div class="value">{len(task_features)}</div></div><div class="card"><div class="muted">Tasks with findings</div><div class="value">{issueful_tasks}</div></div><div class="card"><div class="muted">Raw QA findings</div><div class="value">{raw_finding_count}</div></div><div class="card"><div class="muted">Unique findings</div><div class="value">{unique_finding_count}</div></div><div class="card"><div class="muted">BADIMAGERY tasks</div><div class="value">{badimagery_count}</div></div></div>
 <p><b>Errors:</b> {severity_counts.get('ERROR',0)} &nbsp; <b>Warnings:</b> {severity_counts.get('WARNING',0)} &nbsp; <b>Other/unknown:</b> {len(error_features) - severity_counts.get('ERROR',0) - severity_counts.get('WARNING',0)}</p>
-<div class="note"><b>Important:</b> The raw <code>qa_errors.geojson</code> contains one feature per reported JOSM finding. Unique-object and rule metrics are derived per task and are shown in the task summary.</div>
-<a class="button" href="map.html" target="_blank">Open interactive map</a><h2>Issues by rule</h2><table><thead><tr><th>Rule</th><th>Findings</th></tr></thead><tbody>{rows}</tbody></table>
-<h2>Outputs</h2><p><a href="qa_errors.geojson">Raw QA findings GeoJSON</a><br><a href="task_grid_qa_summary.geojson">Task grid QA summary GeoJSON</a></p>
+{duplicate_note}
+{badimagery_section}
+{review_section}
+<div class="note"><b>Run audit information</b><br>QA Buddy: {escape(metadata.get('qa_buddy_version', 'unknown'))}<br>Project ID: {escape(str(metadata.get('project_id') or 'not provided'))}<br>Run started (UTC): {escape(metadata.get('run_started_utc', 'unknown'))}<br>Validation engine: {escape(metadata.get('validation_engine', 'unknown'))}<br>JOSM tested version: {escape(toolchain.get('josm_tested_version', 'unknown'))}<br>Jython: {escape(toolchain.get('jython_version', 'unknown'))}<br>Java: {escape(toolchain.get('java_runtime', 'unknown'))}<br>Osmium: {escape(toolchain.get('osmium_version', 'unknown'))}</div>
+<h2>Input files</h2><table><thead><tr><th>Input</th><th>Filename</th><th>Size (bytes)</th><th>SHA-256</th></tr></thead><tbody>{input_rows or '<tr><td colspan="4">Input metadata unavailable</td></tr>'}</tbody></table>
+<a class="button" href="map.html" target="_blank">Open interactive map</a><h2>Issues by rule</h2><table><thead><tr><th>Rule</th><th>Raw findings</th></tr></thead><tbody>{rows}</tbody></table>
+<h2>Outputs</h2><p><a href="qa_errors.geojson">Raw QA findings GeoJSON</a><br><a href="task_grid_qa_summary.geojson">Task grid QA summary GeoJSON</a><br><a href="run_metadata.json">Run metadata (JSON)</a></p>
 </body></html>'''
     Path(report_path).write_text(report, encoding="utf-8")
     _write_map(errors, tasks, map_path)

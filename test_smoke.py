@@ -27,6 +27,7 @@ def test_task_aggregation_and_report():
             feature({"type":"Point","coordinates":[0.5,0.5]}, {"severity":"Errors","object_id":"way/1","rule":"MapCSS","message":"Example issue"}),
             feature({"type":"Point","coordinates":[1,1]}, {"severity":"Warnings","object_id":"way/1","rule":"MapCSS","message":"Another issue"}),
             feature({"type":"Point","coordinates":[1.5,1.5]}, {"severity":"Warnings","object_id":"node/2","rule":"TagChecker","message":"Tag issue"}),
+            feature({"type":"Point","coordinates":[10,10]}, {"severity":"Warnings","object_id":"way/99","rule":"MapCSS","message":"Outside task grid"}),
         ]}
         metadata_data = {
             "qa_buddy_version": "0.1.0",
@@ -57,9 +58,15 @@ def test_task_aggregation_and_report():
             assert props["qa_warning_count"] == 2
             assert props["qa_task_status"] == "VALIDATED"
             assert props["qa_badimagery"] is False
+            assert props["qa_priority"] == "MEDIUM"
             assert bad_props["qa_task_status"] == "BADIMAGERY"
             assert bad_props["qa_badimagery"] is True
             assert bad_props["qa_unique_finding_count"] == 0
+            assert bad_props["qa_priority"] == "HIGH"
+            assert result["qa_summary"]["raw_josm_finding_count"] == 5
+            assert result["qa_summary"]["task_associated_finding_count"] == 4
+            assert result["qa_summary"]["unassigned_finding_count"] == 1
+            assert result["qa_summary"]["task_associated_unique_finding_count"] == 3
             generate_report(str(errors), str(summary), str(report), str(map_path), str(metadata))
             html = report.read_text(encoding="utf-8")
             map_html = map_path.read_text(encoding="utf-8")

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 import sys
 import os
-import zipfile
-import urllib
 import traceback
 import json
 import time
@@ -47,21 +45,17 @@ try:
     work_dir = WORK_DIR
 
     extract_path = work_dir + "/hot_rules"
-    if not os.path.exists(extract_path):
-        print("Downloading HOT TM MapCSS rules...")
-        sys.stdout.flush()
-        hot_zip_url = "https://josm.openstreetmap.de/josmfile?page=Rules/ValidatingBuildingsInHOTTMProjects&zip=1"
-        zip_path = work_dir + "/hot_building_rules.zip"
-        urllib.urlretrieve(hot_zip_url, zip_path)
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_path)
-
     mapcss_file = None
     for root, dirs, files in os.walk(extract_path):
         for file in files:
             if file.endswith(".mapcss"):
                 mapcss_file = os.path.join(root, file)
                 break
+        if mapcss_file:
+            break
+
+    if not mapcss_file:
+        raise RuntimeError("HOT TM MapCSS rules were not prepared before JOSM validation started.")
 
     custom_mapcss_path = work_dir + "/size_rule.mapcss"
     with open(custom_mapcss_path, "w") as f:
@@ -91,9 +85,8 @@ try:
     except Exception as e:
         print("  -> Failed to load built-in geometry.mapcss: " + str(e))
 
-    if mapcss_file:
-        mapcss_checker.addMapCSS("file:///" + mapcss_file.replace("\\", "/"))
-        print("  -> HOT TM MapCSS rules loaded.")
+    mapcss_checker.addMapCSS("file:///" + mapcss_file.replace("\\", "/"))
+    print("  -> HOT TM MapCSS rules loaded.")
     mapcss_checker.addMapCSS("file:///" + custom_mapcss_path.replace("\\", "/"))
     print("  -> Custom oversize MapCSS rule loaded.")
     sys.stdout.flush()

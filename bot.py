@@ -44,18 +44,32 @@ try:
     I18n.init()
     work_dir = WORK_DIR
 
-    extract_path = work_dir + "/hot_rules"
+    extract_path = os.path.join(work_dir, "hot_rules")
     mapcss_file = None
-    for root, dirs, files in os.walk(extract_path):
-        for file in files:
-            if file.endswith(".mapcss"):
-                mapcss_file = os.path.join(root, file)
-                break
-        if mapcss_file:
-            break
+    if os.path.isdir(extract_path):
+        # The HOT rules ZIP is currently extracted flat into hot_rules.
+        # Prefer direct directory listing for deterministic Windows/Jython behavior.
+        for filename in os.listdir(extract_path):
+            if filename.endswith(".mapcss"):
+                candidate = os.path.join(extract_path, filename)
+                if os.path.isfile(candidate):
+                    mapcss_file = candidate
+                    break
+        # Keep a recursive fallback in case the ZIP layout changes later.
+        if not mapcss_file:
+            for root, dirs, files in os.walk(extract_path):
+                for filename in files:
+                    if filename.endswith(".mapcss"):
+                        mapcss_file = os.path.join(root, filename)
+                        break
+                if mapcss_file:
+                    break
 
     if not mapcss_file:
-        raise RuntimeError("HOT TM MapCSS rules were not prepared before JOSM validation started.")
+        raise RuntimeError("HOT TM MapCSS rules were not prepared before JOSM validation started: " + extract_path)
+
+    print("  -> HOT TM MapCSS rule file found: " + mapcss_file)
+    sys.stdout.flush()
 
     custom_mapcss_path = work_dir + "/size_rule.mapcss"
     with open(custom_mapcss_path, "w") as f:
@@ -145,18 +159,42 @@ try:
     all_errors = []
 
     total_tests = len(test_list)
+    total_objects = primitives.size()
     for idx, test in enumerate(test_list, start=1):
         rule_name = test.getClass().getSimpleName()
         if not rule_name or rule_name == "":
             rule_name = test.getClass().getName().split(".")[-1]
+        is_slow_validator = (rule_name == "Ways")
         print("  [" + str(idx) + "/" + str(total_tests) + "] Running " + rule_name + "...")
+        if is_slow_validator:
+            print("      This is the slowest validator on large datasets.")
+            print("      Progress is reported by object batches; validation semantics are unchanged.")
         sys.stdout.flush()
         t_start = time.time()
         try:
             test.startTest(NullProgressMonitor.INSTANCE)
             if rule_name == "UntaggedWay":
                 populate_ways_used_in_relations(test, dataset)
-            test.visit(java_primitives)
+
+            if is_slow_validator and total_objects > 0:
+                batch_size = 10000
+                processed = 0
+                batch_start = time.time()
+                while processed < total_objects:
+                    end = min(processed + batch_size, total_objects)
+                    print("      Processing objects " + str(processed + 1) + "-" + str(end) + "/" + str(total_objects) + " (" + str(round(end * 100.0 / total_objects, 1)) + "%)...")
+                    sys.stdout.flush()
+                    test.visit(java_primitives.subList(processed, end))
+                    processed = end
+                    elapsed = time.time() - batch_start
+                    rate = processed / elapsed if elapsed > 0 else 0
+                    remaining = total_objects - processed
+                    eta = remaining / rate if rate > 0 else 0
+                    print("      Batch complete: " + str(processed) + "/" + str(total_objects) + " (" + str(round(processed * 100.0 / total_objects, 1)) + "%), elapsed " + str(round(elapsed, 1)) + "s, ETA ~" + str(round(eta, 1)) + "s")
+                    sys.stdout.flush()
+            else:
+                test.visit(java_primitives)
+
             test.endTest()
             errs = test.getErrors()
             found_count = len(errs) if errs else 0

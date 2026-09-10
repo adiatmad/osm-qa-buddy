@@ -65,6 +65,9 @@ def test_task_aggregation_and_report():
             assert "BADIMAGERY tasks</div>" in html
             assert "1 task marked BADIMAGERY" in html
             assert "Please review the imagery and confirm whether the task can reasonably be mapped." in html
+            assert "Tasks requiring review" in html
+            assert "Unique OSM objects" in html
+            assert "Task</th><th>Status</th><th>Findings</th>" in html
             assert "Human review required" in html
             assert "JOSM tested version: 19613" in html
             assert "63564" in html

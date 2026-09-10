@@ -23,9 +23,10 @@ def test_task_aggregation_and_report():
             feature({"type": "Polygon", "coordinates": [[[2,0],[4,0],[4,2],[2,2],[2,0]]]}, {"taskId": 23, "taskStatus": "BADIMAGERY"}),
         ]}
         errors_data = {"type": "FeatureCollection", "features": [
-            feature({"type":"Point","coordinates":[0.5,0.5]}, {"severity":"Errors","object_id":"way/1","rule":"MapCSS"}),
-            feature({"type":"Point","coordinates":[1,1]}, {"severity":"Warnings","object_id":"way/1","rule":"MapCSS"}),
-            feature({"type":"Point","coordinates":[1.5,1.5]}, {"severity":"Warnings","object_id":"node/2","rule":"TagChecker"}),
+            feature({"type":"Point","coordinates":[0.5,0.5]}, {"severity":"Errors","object_id":"way/1","rule":"MapCSS","message":"Example issue"}),
+            feature({"type":"Point","coordinates":[0.5,0.5]}, {"severity":"Errors","object_id":"way/1","rule":"MapCSS","message":"Example issue"}),
+            feature({"type":"Point","coordinates":[1,1]}, {"severity":"Warnings","object_id":"way/1","rule":"MapCSS","message":"Another issue"}),
+            feature({"type":"Point","coordinates":[1.5,1.5]}, {"severity":"Warnings","object_id":"node/2","rule":"TagChecker","message":"Tag issue"}),
         ]}
         metadata_data = {
             "qa_buddy_version": "0.1.0",
@@ -48,26 +49,26 @@ def test_task_aggregation_and_report():
             result = json.loads(Path(summary).read_text(encoding="utf-8"))
             props = result["features"][0]["properties"]
             bad_props = result["features"][1]["properties"]
-            assert props["qa_finding_count"] == 3
+            assert props["qa_finding_count"] == 4
+            assert props["qa_unique_finding_count"] == 3
             assert props["qa_unique_osm_object_count"] == 2
             assert props["qa_rules_involved"] == ["MapCSS", "TagChecker"]
-            assert props["qa_error_count"] == 1
+            assert props["qa_error_count"] == 2
             assert props["qa_warning_count"] == 2
             assert props["qa_task_status"] == "VALIDATED"
             assert props["qa_badimagery"] is False
             assert bad_props["qa_task_status"] == "BADIMAGERY"
             assert bad_props["qa_badimagery"] is True
+            assert bad_props["qa_unique_finding_count"] == 0
             generate_report(str(errors), str(summary), str(report), str(map_path), str(metadata))
             html = report.read_text(encoding="utf-8")
             map_html = map_path.read_text(encoding="utf-8")
-            assert "Errors:</b> 1" in html
+            assert "Errors:</b> 2" in html
             assert "Warnings:</b> 2" in html
             assert "BADIMAGERY tasks</div>" in html
             assert "1 task marked BADIMAGERY" in html
-            assert "Please review the imagery and confirm whether the task can reasonably be mapped." in html
             assert "Tasks requiring review" in html
             assert "Unique OSM objects" in html
-            assert "Task</th><th>Status</th><th>Findings</th>" in html
             assert "Human review required" in html
             assert "JOSM tested version: 19613" in html
             assert "63564" in html

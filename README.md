@@ -38,19 +38,66 @@ This has currently been tested end-to-end on **Windows with Docker**. Mac and Li
 
 ---
 
-## The PM workflow
+## Run it locally
 
-The intended workflow is deliberately simple.
+OSM QA Buddy is currently run from your own computer. The easiest way is to clone the repository and launch the local GUI from the command line.
 
-### 1. Start QA Buddy
+### 1. Clone the repository
+
+Open **PowerShell** or another terminal and run:
+
+```powershell
+git clone https://github.com/adiatmad/osm-qa-buddy.git
+cd osm-qa-buddy
+```
+
+### 2. Check the local prerequisites
+
+Run:
+
+```powershell
+python --version
+docker --version
+docker info
+```
+
+You should see a Python 3 version, a Docker version, and Docker's server information.
+
+The app also needs Tkinter. Test it with:
+
+```powershell
+python -c "import tkinter; print('Tkinter OK')"
+```
+
+If all four checks work, your basic local environment is ready.
+
+You **do not** need to install Java, JOSM, Jython, Shapely, or Osmium locally. Docker provides those components for the QA run.
+
+### 3. Start QA Buddy
 
 On Windows, run:
+
+```powershell
+python app.py
+```
+
+Or use the provided launcher:
 
 ```text
 run_qa.bat
 ```
 
-### 2. Enter the HOT TM Project ID
+The GUI should open.
+
+> **Note:** `run_qa.bat` also builds the Docker image and then launches the app. The first run may take longer because Docker needs to build the QA environment.
+
+---
+
+## The PM workflow
+
+The intended workflow is deliberately simple.
+
+### 1. Enter the HOT TM Project ID
 
 For example:
 
@@ -60,23 +107,23 @@ For example:
 
 QA Buddy uses this ID to open the official Tasking Manager download links.
 
-### 3. Download the project boundary
+### 2. Download the project boundary
 
 Click **HOT TM Project Boundary**.
 
 Your browser opens the official Tasking Manager download link. Download the file yourself.
 
-### 4. Download the task grid
+### 3. Download the task grid
 
 Click **HOT TM Task Grid** and download the file yourself.
 
-### 5. Download the OSM data
+### 4. Download the OSM data
 
 Click **Geofabrik Downloads**.
 
 Choose the appropriate country or region and download the matching `.osm.pbf` file.
 
-### 6. Select the three files
+### 5. Select the three files
 
 Choose the files you downloaded:
 
@@ -88,7 +135,7 @@ Choose the files you downloaded:
 
 Windows duplicate filenames such as `(1)` are accepted.
 
-### 7. Start the third-pass validation
+### 6. Start the third-pass validation
 
 Click:
 
@@ -96,7 +143,7 @@ Click:
 
 QA Buddy checks the files, prepares the OSM data, and runs JOSM validation inside Docker.
 
-### 8. Use the result
+### 7. Use the result
 
 The main output for a PM is:
 
@@ -105,6 +152,18 @@ The main output for a PM is:
 Open it in your usual GIS/map workflow and use it to identify **priority tasks or areas for validators to review**.
 
 That's the main idea. **You do not need to understand every technical finding to use the result.**
+
+---
+
+## RAM settings
+
+Most users should leave RAM on **Automatic**.
+
+An optional **Advanced settings** section provides a manual JVM RAM override for users who need it.
+
+Automatic mode chooses a conservative RAM allocation based on the computer's physical memory. Manual values are checked before Docker/JOSM starts; unsafe values are rejected rather than allowing the QA process to start with an unreasonable setting.
+
+The RAM setting is an implementation detail, not a required part of the normal PM workflow.
 
 ---
 
@@ -256,6 +315,7 @@ You need:
 
 - Python 3 with Tkinter
 - Docker Desktop
+- Git, if cloning the repository from GitHub
 - Internet access for the manual source downloads and JOSM/HOT validation rules
 
 **Current platform status:** end-to-end testing has been completed on Windows with Docker. Mac and Linux users are welcome to try the workflow and report results so cross-platform support can be improved.
@@ -269,6 +329,48 @@ You **do not** need to install these locally:
 - Osmium
 
 Docker provides them for the QA run.
+
+---
+
+## Troubleshooting the local setup
+
+### `python` is not recognized
+
+Install Python 3 and make sure it is available from your terminal.
+
+### `docker` is not recognized
+
+Install Docker Desktop and restart the terminal.
+
+### `docker info` fails
+
+Docker Desktop is probably not running. Start Docker Desktop and run:
+
+```powershell
+docker info
+```
+
+again.
+
+### Tkinter test fails
+
+Run:
+
+```powershell
+python -c "import tkinter; print('Tkinter OK')"
+```
+
+If this fails, your Python installation does not currently provide Tkinter.
+
+### The Docker build fails
+
+Check that Docker Desktop is running and that the computer has internet access. Then try:
+
+```powershell
+docker build -t qabot .
+```
+
+The terminal output should show the specific step that failed.
 
 ---
 

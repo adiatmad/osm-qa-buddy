@@ -183,7 +183,8 @@ class App(tk.Tk):
                 raise RuntimeError(f"Docker QA failed (exit code {returncode}). Full log saved to:\n{log_path}")
             self.after(0, lambda: self._docker_done(output_dir, log_path))
         except Exception as exc:
-            self.after(0, lambda: self._docker_failed(str(exc)))
+            message = str(exc)
+            self.after(0, lambda: self._docker_failed(message))
 
     def _docker_done(self, output_dir, log_path):
         self.progress.set(100)

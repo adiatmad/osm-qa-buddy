@@ -34,7 +34,7 @@ Priority areas / tasks
 Human review
 ```
 
-This has currently been tested end-to-end on **Windows with Docker**. Mac and Linux users are welcome to try it and report their results so we can improve cross-platform support.
+This has currently been tested end-to-end on **Windows with Docker Desktop and WSL 2**. Mac and Linux users are welcome to try it and report their results so we can improve cross-platform support.
 
 ---
 
@@ -64,12 +64,12 @@ Windows duplicate filenames such as `(1)` are accepted.
 
 ### 2. Run QA Buddy locally
 
-The easiest way to launch it is from a local command line.
+The easiest way to launch it is from **PowerShell**.
 
-Open **PowerShell** or **Command Prompt**, go to the folder where you cloned/downloaded the repository, and run:
+Open PowerShell, go to the folder where you cloned/downloaded the repository, and run:
 
 ```powershell
-run_qa.bat
+.\run_qa.bat
 ```
 
 This builds the Docker image if needed and opens the QA Buddy GUI.
@@ -80,7 +80,9 @@ If you prefer to start the GUI directly with Python, you can also run:
 python app.py
 ```
 
-However, `run_qa.bat` is the recommended launcher because it also makes sure the Docker image is built before you start the application.
+However, `.\run_qa.bat` is the recommended launcher because it also makes sure the Docker image is built before you start the application.
+
+> **PowerShell note:** use `.\run_qa.bat`, not `run_qa.bat`.
 
 ### 3. Enter the HOT TM Project ID
 
@@ -104,6 +106,8 @@ Click:
 
 QA Buddy checks the files, prepares the OSM data, and runs JOSM validation inside Docker. The GUI shows the live processing log.
 
+The HOT Tasking Manager MapCSS rules are downloaded by the container's **Python 3** runtime before Jython/JOSM validation starts. This avoids relying on the older Jython 2.7 HTTPS stack for external downloads.
+
 ### 6. Use the result
 
 The main output for a PM is:
@@ -116,21 +120,44 @@ That's the main idea. **You do not need to understand every technical finding to
 
 ---
 
-## Testing a new computer before running a real project
+## Testing a new Windows computer before running a real project
 
-If you are testing QA Buddy on another computer, first verify the local prerequisites before downloading a large PBF or starting a real QA run.
+If you are testing QA Buddy on another Windows computer, first install and verify the local prerequisites before downloading a large PBF or starting a real QA run.
+
+### Install the prerequisites with WinGet
+
+For a new Windows machine, this one-line command installs the main software needed by the workflow:
+
+```powershell
+winget install --id Python.Python.3.12 Git.Git Docker.DockerDesktop Microsoft.WSL -e
+```
+
+This installs:
+
+- **Python 3.12** — runs the QA Buddy GUI and Docker orchestrator
+- **Git** — clones/updates the repository
+- **Docker Desktop** — builds and runs the QA container
+- **WSL** — provides the WSL 2 backend used by Docker Desktop on Windows
+
+WinGet supports installing multiple package IDs in one command. citeturn0search0turn1search1turn1search3turn1search0
+
+After installation, reboot Windows if an installer requests it. Open Docker Desktop and make sure it is running with its **WSL 2 based engine/backend** enabled. Docker's Windows documentation identifies WSL 2 and Docker Desktop's WSL 2 backend as the required setup for this container workflow. citeturn0search10
+
+### Verify the installation
 
 Open PowerShell and run:
 
 ```powershell
 python --version
+wsl --version
 docker --version
 docker info
 ```
 
 You should see:
 
-- a working Python 3 installation
+- **Python 3.12.x**
+- a working **WSL 2** installation
 - a Docker version
 - Docker Desktop responding successfully to `docker info`
 
@@ -139,7 +166,7 @@ Then clone the repository and run the launcher:
 ```powershell
 git clone https://github.com/adiatmad/osm-qa-buddy.git
 cd osm-qa-buddy
-run_qa.bat
+.\run_qa.bat
 ```
 
 If the Docker image builds successfully and the QA Buddy window opens, the main local application prerequisites are working.
@@ -152,7 +179,7 @@ python test_memory.py
 python test_smoke.py
 ```
 
-A successful result from these commands verifies Python syntax, the RAM policy tests, and the existing QA/report smoke tests. The Docker build performed by `run_qa.bat` verifies that the container environment can be assembled.
+A successful result from these commands verifies Python syntax, the RAM policy tests, and the existing QA/report smoke tests. The Docker build performed by `.\run_qa.bat` verifies that the container environment can be assembled.
 
 **You do not need to install Java, JOSM, Jython, Shapely, or Osmium on the host computer.** They are provided inside Docker for the QA run.
 
@@ -243,6 +270,8 @@ Docker pre-flight checks
         ↓
 Osmium clips OSM data to the project area
         ↓
+Python 3 downloads HOT TM MapCSS rules
+        ↓
 JOSM + Jython run validation rules
         ↓
 Findings are connected to Tasking Manager tasks
@@ -284,6 +313,10 @@ https://tasking-manager-production-api.hotosm.org/api/v2/projects/<PROJECT_ID>/t
 https://download.geofabrik.de/
 ```
 
+### HOT TM validation rules
+
+The container downloads the HOT Tasking Manager MapCSS validation rules from JOSM's rule endpoint during the QA run. The download is handled by Python 3 before Jython/JOSM validation starts.
+
 ---
 
 ## Safety checks before QA
@@ -295,6 +328,7 @@ Before JOSM validation starts, QA Buddy checks that:
 - the Task Grid is valid polygon data
 - the Task Grid overlaps the Project Boundary
 - the Geofabrik PBF can be read by Osmium
+- the HOT TM MapCSS rules were successfully prepared
 
 If these checks fail, QA stops before producing a QA result.
 
@@ -302,13 +336,15 @@ If these checks fail, QA stops before producing a QA result.
 
 ## Requirements
 
-You need:
+For the current supported/tested Windows workflow you need:
 
-- Python 3 with Tkinter
-- Docker Desktop
-- Internet access for the manual source downloads and JOSM/HOT validation rules
+- **Windows with WSL 2**
+- **Python 3.12** with Tkinter
+- **Docker Desktop** using the WSL 2 backend
+- **Git**
+- Internet access for the manual source downloads and HOT/JOSM validation rules
 
-**Current platform status:** end-to-end testing has been completed on Windows with Docker. Mac and Linux users are welcome to try the workflow and report results so cross-platform support can be improved.
+**Current platform status:** end-to-end testing has been completed on Windows with Docker Desktop and WSL 2. Mac and Linux users are welcome to try the workflow and report results so cross-platform support can be improved.
 
 You **do not** need to install these locally:
 
@@ -325,6 +361,8 @@ Docker provides them for the QA run.
 ## Why Docker?
 
 QA Buddy uses Docker so that the important QA components run in a controlled environment instead of depending on every user's local Java, JOSM, Python, and Osmium setup.
+
+On Windows, Docker Desktop uses the **WSL 2 backend** for this Linux-container workflow.
 
 In simple terms:
 

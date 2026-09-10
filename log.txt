@@ -1,135 +1,3 @@
- omViaToSorter.class
-SHA-256-Digest: XQQw9Q4MWLD4kvWQTkAerWjiWBr9MXgN5qHublR9Wto=
-
-Name: org/openstreetmap/josm/gui/datatransfer/data/PrimitiveTransferData
- .class
-SHA-256-Digest: idzO5+nVUArdLfJo93S+DlnewNjYaNAB+5ScsN2+xuw=
-
-Name: org/apache/commons/lang3/concurrent/AbstractCircuitBreaker$State$2
- .class
-SHA-256-Digest: MSmVkWYe6ePmWBlrHJbspc1pc8DXRPbYrc2G3XFtkfg=
-
-Name: org/jetbrains/annotations/UnknownNullability.class
-SHA-256-Digest: QjoGu+o2LHEdlGXEKYUy1tl6JGh02+agNYA44hljkV0=
-
-Name: org/openstreetmap/josm/gui/tagging/presets/items/PresetLink$Taggin
- gPresetMouseAdapter.class
-SHA-256-Digest: siPFYy/Kgh9nX8SBo9VQri47l5xch2jrWzkdsAFsLLQ=
-
-Name: org/apache/commons/codec/language/bm/PhoneticEngine$RulesApplicati
- on.class
-SHA-256-Digest: xq0vfNbwMG3uCBPIWzA19+ybnvxMinbBN8YhFHwsopY=
-
-Name: org/openstreetmap/josm/data/osm/event/DatasetEventManager$Listener
- Info.class
-SHA-256-Digest: N9ZlMkvobt3luqVAvxTUiC8nYl7REda4CkOAAAMNSi4=
-
-Name: org/openstreetmap/josm/gui/tagging/presets/TaggingPresetMenu.class
-SHA-256-Digest: Y1Dc0iTtQKgJGj4ur/jmrpDdG9mSIIV+QiIuISVYavc=
-
-Name: com/github/weisj/jsvg/parser/resources/impl/SVGResource.class
-SHA-256-Digest: WG5pRI4YYjXlsS0nrex39y74Ou3o8h0AaZY71UiSkD4=
-
-Name: org/openstreetmap/josm/io/imagery/ImageryReader$State.class
-SHA-256-Digest: KsaCPeWvVpH5io53n72eSzxMrXWb8gB1S4Xnx/MRDcs=
-
-Name: images/presets/health/hospital.svg
-SHA-256-Digest: e3o06gXGccgUOKw+JBCeef9D+SeocsPm6YOJTmeFbtU=
-
-Name: org/apache/commons/io/input/CharacterFilterReader.class
-SHA-256-Digest: BzNPp/JA4kdKTaiqtAIk06K3Tgd64PnEFXXUlw9aYOU=
-
-Name: org/openstreetmap/josm/gui/util/MultikeyActionsHandler$ShowLayersP
- opupWorker$StatusLinePopupMenuListener.class
-SHA-256-Digest: i0PhOixQmorX/P8gRPegIP7vtlOOSHr6yuRJ6xLlEmk=
-
-Name: org/openstreetmap/josm/io/OsmJsonReader.class
-SHA-256-Digest: njJKTy5+ZLX3KY4vlQhkoLzPd49DetPzq4MJq+RS9fw=
-
-Name: org/openstreetmap/josm/data/osm/Stylable.class
-SHA-256-Digest: 0l+P2OnpyhOxhM1fX+Rqm1pO7E4jpYX9QujtKozKgdQ=
-
-Name: images/presets/misc/deprecated.svg
-SHA-256-Digest: Yr67wR/U9gzR5kSLJE+z0oJMmhV5S/1m+XblIqsMCjc=
-
-Name: images/presets/sightseeing/battlefield.svg
-SHA-256-Digest: cc5UgKHRwBbA4vmLWik+syQOc/ytjO0OgBN9Q+Rmilg=
-
-Name: org/openstreetmap/josm/gui/dialogs/CommandStackDialog$MouseEventHa
- ndler.class
-SHA-256-Digest: zcaZra/bzjjWNNJP/3ggcxkzBe6DRDQayRywAtIvHJc=
-
-Name: org/openstreetmap/josm/actions/SplitWayAction$SegmentToKeepSelecti
- onDialog.class
-SHA-256-Digest: KVXaLc5rBUTXS+6vBL5C7Y410pT5hulMN6R8R9IIiMQ=
-
-Name: org/apache/commons/compress/compressors/bzip2/Rand.class
-SHA-256-Digest: jFznGyTLUm9bGa39IlV5NK6eeEotpGtfD6O15K9Khq8=
-
-Name: org/openstreetmap/josm/actions/ReorderImageryLayersAction.class
-SHA-256-Digest: Vik5YhzhzApNdAdbIfo0s7KaIRK05JV74/Sm0slebLM=
-
-Name: images/presets/vehicle/restriction/plain/foot.svg
-SHA-256-Digest: GC1DTxxl7NrPX/QDl2IPYjkZDT3toZ/fJO3vXF/02rc=
-
-Name: org/openstreetmap/josm/gui/preferences/PreferenceTabbedPane$WheelL
- istener.class
-SHA-256-Digest: k2Cc4sViHE1fbDR/V4oeL4tXWxZyVBvGjnpWX/ddmKw=
-
-Name: com/drew/lang/RandomAccessFileReader.class
-SHA-256-Digest: YeTda4HdUHbWJJnJjlDwRqWUjg2QxrTghixfr3cYPh4=
-
-Name: org/openstreetmap/josm/actions/OrthogonalizeAction$WayData.class
-SHA-256-Digest: PibACV7Tfy0B0jA5jQBe6lzurw6znbCM8BQrDzf6YLA=
-
-Name: org/openstreetmap/josm/gui/dialogs/ConflictResolutionDialog$ApplyR
- esolutionAction.class
-SHA-256-Digest: 4LaBDq2In6YaQuJoWHPkAtHcrThK6Ayzs4+cIVUPVlY=
-
-Name: org/openstreetmap/josm/gui/download/PlaceSelection$Server.class
-SHA-256-Digest: B2uHXltpvDg4rHNswvab1MAco/+1g40+aaeJFOn2opc=
-
-Name: com/github/weisj/jsvg/geometry/path/LineTo.class
-SHA-256-Digest: gT6tNpSj6aRDwu18S70XmnkotQnLz5fl9OV13G1mnu4=
-
-Name: images/mapmode/rope.svg
-SHA-256-Digest: LxFtjbVAXJ38wptU65S1VkMHuILJO0qYAEq+DtyMDvU=
-
-Name: images/dialogs/showhide.svg
-SHA-256-Digest: VGvagBb0oOlJs2ZdXqDvVixmd/lWyb+39RSn6fmcYVI=
-
-Name: org/apache/commons/codec/binary/Base16.class
-SHA-256-Digest: iiEezl/mW696n2vAfoNxltN9NEFoRh3wwZMaMVofjX8=
-
-Name: org/apache/commons/io/filefilter/PathEqualsFileFilter.class
-SHA-256-Digest: aN+8+McgyrtYMl+FWI3XsL+vR1xzV2GzXMNfxqJNlaM=
-
-Name: org/apache/commons/codec/language/bm/ash_rules_russian.txt
-SHA-256-Digest: qJusCL2MSuoVjPDuAua4+J+90WDK7uTtKHPoJNn7SiY=
-
-Name: org/openstreetmap/josm/command/AddCommand.class
-SHA-256-Digest: SJNC8KGO12xcyNCyaX7LFDRAl3e0AktcEZg+V91olpg=
-
-Name: org/openstreetmap/josm/gui/history/HistoryViewerPanel$ZoomToObject
- Action.class
-SHA-256-Digest: ABSoQZILjxGInueykfa/ckIH9SeSNy+vWG+zu6hhv1k=
-
-Name: images/dialogs/position.svg
-SHA-256-Digest: g1oZufRrF67zvUdz3MDLIL+redUBYSzg1rtqQtD8Nxw=
-
-Name: org/apache/commons/codec/language/Caverphone2.class
-SHA-256-Digest: hBZu3AclaJGejLul35dTmw3MjUuBE3rCnq6ULmbptYQ=
-
-Name: org/openstreetmap/josm/gui/util/WindowGeometry.class
-SHA-256-Digest: 3WyugQL/Cxf4qZ6ONdIrlzCXfHRJUiHpFm0ubnM3n5o=
-
-Name: images/presets/nautical/waterway_ditch.svg
-SHA-256-Digest: 3boji3JcJiTKMmWOCHTaYdngGc4VNeDO2t4wM6zYzHM=
-
-Name: images/statusline/lon.svg
-SHA-256-Digest: +pX+TWwuv3UBs69AEwQbwv7P9bNcGAjhiKlpEJqYLQI=
-
-Name: org/jetbrains/annotations/Range.class
 SHA-256-Digest: 6Ely2lNrh8qFG21S1McFuo1plo37DsCWW9ludg/j0z8=
 
 Name: images/presets/education/language_school.svg
@@ -9031,4 +8899,133 @@ PS C:\WINDOWS\system32> docker exec 104a81ead332 sh -c "cat /proc/600/status | g
 cat: /proc/600/status: No such file or directory
 PS C:\WINDOWS\system32> docker exec 104a81ead332 sh -c "cat /proc/600/stat | cut -d' ' -f14-17"
 cat: /proc/600/stat: No such file or directory
+PS C:\WINDOWS\system32> docker exec 104a81ead332 sh -c "ps -ef"
+UID          PID    PPID  C STIME TTY          TIME CMD
+root           1       0  0 04:14 ?        00:00:03 python3 /app/orchestrator.py /data/input/region.osm.pbf /data/input/project_aoi.geojson /data/input/project_tasks.geojson /data/output
+root          68       1 99 04:14 ?        02:06:45 java -Xmx10g -cp /app/josm-tested.jar:/app/jython.jar org.python.util.jython /app/bot.py
+root         151       0  0 06:20 ?        00:00:00 sh -c ps -ef
+root         157     151  0 06:20 ?        00:00:00 ps -ef
+PS C:\WINDOWS\system32> docker exec 104a81ead332 sh -c "cat /proc/600/status | grep -E 'Name|State|VmPeak|VmSize|VmRSS|Threads'"
+cat: /proc/600/status: No such file or directory
+PS C:\WINDOWS\system32> docker run --rm --entrypoint python3 qabot -c "import zipfile,re; z=zipfile.ZipFile('/app/josm-tested.jar'); s=z.read('META-INF/MANIFEST.MF').decode('utf-8','replace'); print(s[:5000])"
+Manifest-Version: 1.0
+Main-class: org.openstreetmap.josm.gui.MainApplication
+Permissions: all-permissions
+Codebase: josm.openstreetmap.de
+Application-Name: JOSM - Java OpenStreetMap Editor
+Add-Exports: java.base/sun.security.util java.desktop/com.apple.eawt jav
+ a.desktop/com.sun.imageio.spi javafx.graphics/com.sun.javafx.applicatio
+ n jdk.deploy/com.sun.deploy.config
+Add-Opens: java.base/java.lang java.base/java.nio java.base/jdk.internal
+ .loader java.base/jdk.internal.ref java.base/sun.security.x509 java.des
+ ktop/javax.imageio.spi java.desktop/com.sun.imageio.plugins.jpeg java.d
+ esktop/javax.swing.text.html java.prefs/java.util.prefs
+
+Name: org/openstreetmap/josm/gui/layer/NoteLayer.class
+SHA-256-Digest: 0NdF0K6wal/s6nezLfqQ+oVSrDZxolFQR5Zkl0BJoqs=
+
+Name: org/apache/commons/codec/language/bm/Rule$1.class
+SHA-256-Digest: Fwi7Bm83V2AdrBBffYwBpFr13NLFR/hygy6LDa8W2tU=
+
+Name: org/openstreetmap/josm/actions/mapmode/DrawSnapHelper.class
+SHA-256-Digest: G+qSlBdXbi/lwwXcR4KB8cbazUW5Xmgw1Dcf8dXARXU=
+
+Name: images/presets/transport/railway/signal.svg
+SHA-256-Digest: dKZinhr6/vDAAOefpLG+/zlTVWjA3gefRblwnyZssdA=
+
+Name: org/apache/commons/jcs3/engine/memory/soft/package-info.class
+SHA-256-Digest: 3egLei5lgSQofY0IpkWUZkwy2J3tPjhfzr5G0J4L72Y=
+
+Name: org/openstreetmap/josm/gui/dialogs/layer/LayerVisibilityAction$Abs
+ tractFilterSlider.class
+SHA-256-Digest: BrAlTdPGGwNNydIjkA8dnPGcc35rStoIhahwatlt5Ks=
+
+Name: org/openstreetmap/josm/actions/HelpAction.class
+SHA-256-Digest: 1Tri4yrD40NLGCb/iAbDSs90Dq6zQnu2C0kJnTi/9Fk=
+
+Name: org/openstreetmap/josm/gui/MapStatus$MapStatusPopupMenu$1.class
+SHA-256-Digest: GeFrztT8e/+KhTEMS3Hg1hM3EPrylM/kG61+RrzUYbw=
+
+Name: org/openstreetmap/josm/tools/CompositeList.class
+SHA-256-Digest: HFmvyicPzG4TcEtIqsf7hONhO4NJTIiJydI8zPuCX9M=
+
+Name: org/openstreetmap/josm/data/IQuadBucketType.class
+SHA-256-Digest: KvYLFd4o4FK4H2gNSaKQKqzMZ2ukfOB7EvhIMaNbl48=
+
+Name: com/drew/metadata/photoshop/Subpath.class
+SHA-256-Digest: 317BXVVnlX5VMij+PnU/HMQ9CpnroDXUz3pv/xrXpns=
+
+Name: org/apache/commons/lang3/function/FailableIntBinaryOperator.class
+SHA-256-Digest: m6mfIWme+KmqmnAPaqZ46GREIJ3NtTq7px3pUEhfy+o=
+
+Name: org/openstreetmap/josm/gui/dialogs/relation/GenericRelationEditor$
+ MemberTableDblClickAdapter.class
+SHA-256-Digest: rlse8jDCEgbQXcCTo5Xx0xoNH9Y3Y4cftPSwdvEGXpg=
+
+Name: org/openstreetmap/josm/gui/bbox/JosmMapViewer$TMSTileSourceProvide
+ r.class
+SHA-256-Digest: XnahS16KnIdB+hMB0+hbkGeKhpg85ay6NKHsKwFaV0Y=
+
+Name: org/apache/commons/jcs3/engine/control/group/GroupAttrName.class
+SHA-256-Digest: v2lZZYU1isrsO6bpzWs6ytiKdTl9nV7Xl57P9AEoo8g=
+
+Name: org/openstreetmap/josm/io/session/GenericSessionExporter$LayerSave
+ Action.class
+SHA-256-Digest: n6IaN6m42/fXV23csRcVUgv9AdzSgexEOcM2tiz2zUY=
+
+Name: org/openstreetmap/josm/gui/io/importexport/ValidatorErrorExporter.
+ class
+SHA-256-Digest: kNfS4NyvW6vwpcCgQ7IaOvd+4vVSArfIGaBNO70G6Ws=
+
+Name: images/presets/landuse/cemetery.svg
+SHA-256-Digest: /KGTFFJKmH7mHzF7Lqf2SgBGkgSDGyBpBM7S2xbbwkI=
+
+Name: org/openstreetmap/josm/gui/MapView$RepaintListener.class
+SHA-256-Digest: 8bsuwtdJA2U+LHa7yQNAXrZCTNbAkN3yrdi13TCEUKw=
+
+Name: org/openstreetmap/josm/gui/tagging/ac/AutoCompTextField.class
+SHA-256-Digest: GYcEZUl5PlTImt/muIqQ68SNt8CiKJh81w8HfdvYvP0=
+
+Name: org/openstreetmap/josm/data/projection/proj/AzimuthalEquidistant$M
+ ode.class
+SHA-256-Digest: V3ZMSUmQzHhdDx00Z8lBRYP4E7GcO2kY7SdSzGLwDcA=
+
+Name: org/openstreetmap/josm/io/ChangesetUpdater.class
+SHA-256-Digest: H2jpjxdtgNGIvixdGgzJuR1qoHN9JYBQ9KTkmFA0bY8=
+
+Name: org/openstreetmap/josm/gui/dialogs/ToggleDialog$TitleBar$DialogPop
+ upMenu.class
+SHA-256-Digest: PeHfUs4/ADTsPHhf+45oPwJ3aYPklBoQwejG+12q2fI=
+
+Name: images/dialogs/mappaint/wireframe_small.svg
+SHA-256-Digest: nTRKDhGUSKBNXRLaKTFEHOHVgW1Elep1SyT6Td7bIdw=
+
+Name: org/openstreetmap/josm/gui/mappaint/styleelement/MapImage.class
+SHA-256-Digest: 9brRjFRKaXIw05ijGUxoSDBVpGlLAt52dqmOhEvzuak=
+
+Name: org/apache/commons/jcs3/access/AbstractCacheAccess.class
+SHA-256-Digest: lxZGEqqius8IJJ0yoP1VofUtKoROYokmEhfrNzLTl+E=
+
+Name: org/openstreetmap/josm/gui/mappaint/StyleSetting$StyleSettingGroup
+ .class
+SHA-256-Digest: CMpV+uNL/0D6de+jFyNbqkYHMvx9h8PeYK3sKNi1sYM=
+
+Name: com/github/weisj/jsvg/renderer/SVGRenderingHints$Key.class
+SHA-256-Digest: 2f0bSUSaR1Ra4/g3kVbcJVWON1Fm153QDG4KE91EllI=
+
+Name: org/openstreetmap/gui/jmapviewer/interfaces/MapMarker$STYLE.class
+SHA-256-Digest: IU/pq7FRsyru0hXAkV0VDWxXWXezhvKE3doCYG76VVs=
+
+Name: org/apache/commons/codec/net/QCodec.class
+SHA-256-Digest: BCPhDBqXTjavyZlRFydA3TjNrkF7LjgNKmHH52/vD8M=
+
+Name: org/apache/commons/jcs3/auxiliary/disk/AbstractDiskCacheAttributes
+ .class
+SHA-256-Digest: BSlcRCX2xKe171y1MZr2cPDeMAUf7NIqOQI7QI/+2MQ=
+
+Name: org/openstreetmap/josm/data/gpx/GpxData$XMLNamespace.class
+SHA-256-Digest: Vk0N+kvgIOBsfoKw9t3DSy8NHXulh4YCFvA1vCaz+xg=
+
+Name: org/openstreetmap/josm/gui/layer/geoimage/ImageViewerDialog$ImageR
+ emoveF
 PS C:\WINDOWS\system32>

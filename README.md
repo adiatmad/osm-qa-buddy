@@ -1,60 +1,320 @@
 # OSM QA Buddy
 
-OSM QA Buddy runs a third-pass validation of a completed HOT Tasking Manager project using JOSM validation rules inside Docker.
+**An unofficial companion for HOT Tasking Manager projects, built to support third-pass QA.**
 
-## PM workflow
+OSM QA Buddy helps a HOT Tasking Manager Project Manager answer a simple question:
 
-1. Run `run_qa.bat` on Windows.
-2. Enter the HOT Tasking Manager Project ID.
-3. Open the HOT TM Project Boundary download link and download the file yourself.
-4. Open the HOT TM Task Grid download link and download the file yourself.
-5. Open **Geofabrik downloads**, choose the appropriate country/region, and download the matching `.osm.pbf` file.
-6. Select the three downloaded files in the GUI:
-   - Project Boundary: filename ending `-aoi.geojson` (Windows duplicate suffixes such as `(1)` are accepted)
-   - Task Grid: filename ending `-tasks.geojson` (Windows duplicate suffixes such as `(1)` are accepted)
-   - Geofabrik PBF: filename ending `.osm.pbf` (Windows duplicate suffixes such as `(1)` are accepted)
-7. Click **START 3RD PASS VALIDATION**.
-8. The app performs local checks, then Docker performs authoritative pre-flight, Osmium clipping, and JOSM/Jython validation.
-9. After success, `report.html` opens automatically and `map.html` provides the interactive task/finding map.
+> **“After the normal validation is finished, where should my validators look again?”**
 
-The application does not download HOT TM or Geofabrik source data itself. The PM selects the exact source files being audited.
+It runs established JOSM validation rules against the completed project data, connects potential issues back to Tasking Manager tasks, and highlights the tasks that deserve human review.
 
-## Official sources
+**QA Buddy detects. The PM decides.**
 
-Project Boundary:
-`https://tasking-manager-production-api.hotosm.org/api/v2/projects/<PROJECT_ID>/queries/aoi/?as_file=true`
+---
 
-Task Grid:
-`https://tasking-manager-production-api.hotosm.org/api/v2/projects/<PROJECT_ID>/tasks/?as_file=true`
+## What problem does it solve?
 
-Geofabrik:
-`https://download.geofabrik.de/`
+A HOT Tasking Manager project can reach **100% validated** and still contain quality issues that are easy to miss.
 
-## Pre-flight
+A PM normally does not want to inspect every task again. QA Buddy provides an additional signal that can help the PM focus the next round of human review.
 
-Docker checks that the selected files exist and are readable, both GeoJSON files are valid polygon data, the Task Grid intersects the Project Boundary, and Osmium can read the PBF. Failure stops the pipeline before QA.
+It is **not an official HOT Tasking Manager product** and it does **not replace human validation**.
 
-## Outputs
+Think of it as a **third-pass QA instrument**:
 
-Runs create `osm_qa_buddy_results/project_<ID>_<timestamp>/` with:
+```text
+Mapping
+   ↓
+Normal validation
+   ↓
+100% validated project
+   ↓
+OSM QA Buddy
+   ↓
+Potential problem areas
+   ↓
+Human review
+```
 
-- `report.html` — PM summary
-- `map.html` — interactive task/finding map
-- `qa_errors.geojson` — raw JOSM findings, authoritative
-- `task_grid_qa_summary.geojson` — derived task metrics
-- `sample.osm` — AOI-clipped OSM data
-- `qa_run.log` — full Docker/JOSM log
+---
 
-Task metrics include finding count, unique OSM object count, rules involved, error count, warning count, and unknown-severity count.
+## The PM workflow
+
+The intended workflow is deliberately simple.
+
+### 1. Start QA Buddy
+
+On Windows, run:
+
+```text
+run_qa.bat
+```
+
+### 2. Enter the HOT TM Project ID
+
+For example:
+
+```text
+63564
+```
+
+QA Buddy uses this ID to open the official Tasking Manager download links.
+
+### 3. Download the project boundary
+
+Click the **HOT TM Project Boundary** button.
+
+Your browser opens the official Tasking Manager download link. Download the file yourself.
+
+### 4. Download the task grid
+
+Click the **HOT TM Task Grid** button and download the file yourself.
+
+### 5. Download the OSM data
+
+Click **Geofabrik Downloads**.
+
+Choose the appropriate country or region and download the matching `.osm.pbf` file.
+
+### 6. Select the three files
+
+Choose the files you downloaded:
+
+| File | Expected filename |
+|---|---|
+| Project Boundary | ends with `-aoi.geojson` |
+| Task Grid | ends with `-tasks.geojson` |
+| Geofabrik data | ends with `.osm.pbf` |
+
+Windows duplicate filenames such as `(1)` are accepted.
+
+### 7. Start the third-pass validation
+
+Click:
+
+**START 3RD PASS VALIDATION**
+
+QA Buddy then checks the files, prepares the OSM data, and runs JOSM validation inside Docker.
+
+### 8. Use the result
+
+The most useful output for a PM is:
+
+**`task_grid_qa_summary.geojson`**
+
+Open it in your usual GIS/map workflow and use it to identify **priority tasks or areas for validators to review**.
+
+That is the main idea. You do not need to understand every technical finding to use the result.
+
+---
+
+## What happens behind the scenes?
+
+You do not need to understand this part to use the tool, but this is what QA Buddy does:
+
+```text
+HOT TM Project ID
+        ↓
+Download links opened for you
+        ↓
+You select the downloaded files
+        ↓
+Basic file checks
+        ↓
+Docker pre-flight checks
+        ↓
+Osmium clips OSM data to the project area
+        ↓
+JOSM + Jython run validation rules
+        ↓
+Findings are connected to Tasking Manager tasks
+        ↓
+Task-level QA GeoJSON
+        ↓
+Map + report + audit information
+```
+
+The important design principle is **no silent failure**: if the input data does not look right or the QA pipeline cannot run, the process should stop and tell you rather than quietly producing a misleading result.
+
+---
+
+## What does “third-pass QA” mean?
+
+QA Buddy is not another mapping editor and it is not a replacement for validators.
+
+It is an additional automated check after the normal Tasking Manager workflow.
+
+For example, QA Buddy may identify things such as:
+
+- suspicious tagging
+- duplicated nodes
+- crossing ways
+- untagged or empty ways
+- other issues detected by JOSM validation rules
+- tasks marked **BADIMAGERY** by Tasking Manager
+
+These are **potential issues**, not automatic proof that the mapping is wrong.
+
+A human still makes the final decision.
+
+---
+
+## Main output
+
+### `task_grid_qa_summary.geojson`
+
+This is the file a PM is most likely to use.
+
+It keeps the Tasking Manager task grid and adds QA information to each task, such as:
+
+- `taskId`
+- `taskStatus`
+- number of QA findings
+- number of unique findings
+- number of affected OSM objects
+- error/warning counts
+- validation rules involved
+- BADIMAGERY status
+- QA priority
+
+The goal is to make it easy to answer:
+
+> **“Which tasks should my validators look at first?”**
+
+### Other outputs
+
+| File | Purpose |
+|---|---|
+| `report.html` | Human-readable QA summary and audit information |
+| `map.html` | Interactive map of tasks and findings |
+| `qa_errors.geojson` | Raw JOSM findings used as the authoritative QA output |
+| `task_grid_qa_summary.geojson` | Task-level QA result for PM use |
+| `sample.osm` | OSM data clipped to the project area |
+| `qa_run.log` | Full Docker/JOSM processing log |
+
+---
+
+## Where does the data come from?
+
+QA Buddy intentionally **does not automatically download the source data**.
+
+You choose the exact files that will be audited. This makes the run easier to reproduce and gives the PM a clear record of what was checked.
+
+### Official Tasking Manager sources
+
+**Project Boundary**
+
+```text
+https://tasking-manager-production-api.hotosm.org/api/v2/projects/<PROJECT_ID>/queries/aoi/?as_file=true
+```
+
+**Task Grid**
+
+```text
+https://tasking-manager-production-api.hotosm.org/api/v2/projects/<PROJECT_ID>/tasks/?as_file=true
+```
+
+### OSM data
+
+**Geofabrik Downloads**
+
+```text
+https://download.geofabrik.de/
+```
+
+---
+
+## Safety checks before QA
+
+Before JOSM validation starts, QA Buddy checks that:
+
+- the selected files exist and can be read
+- the Project Boundary is valid polygon data
+- the Task Grid is valid polygon data
+- the Task Grid overlaps the Project Boundary
+- the Geofabrik PBF can be read by Osmium
+
+If these checks fail, QA stops before producing a QA result.
+
+---
 
 ## Requirements
 
-Windows, Python 3 with Tkinter, Docker Desktop, and internet access for the manual source downloads and JOSM/HOT validation rules.
+You need:
 
-Java, JOSM, Jython, Shapely, and Osmium do not need to be installed locally; Docker provides them.
+- Windows
+- Python 3 with Tkinter
+- Docker Desktop
+- Internet access for the manual source downloads and JOSM/HOT validation rules
 
-## Validation status
+You **do not** need to install these locally:
 
-A real Windows run of HOT TM Project 63564 completed end-to-end successfully: 60 task features were accepted, the PBF was readable, AOI clipping completed, JOSM/Jython validation ran, 77 raw JOSM findings were produced, and the task summary/report/map were generated.
+- Java
+- JOSM
+- Jython
+- Shapely
+- Osmium
 
-GitHub Actions CI includes Python syntax checking, a synthetic QA aggregation/report smoke test, and a Docker image build.
+Docker provides them for the QA run.
+
+---
+
+## Why Docker?
+
+QA Buddy uses Docker so that the important QA components run in a controlled environment instead of depending on every user's local Java, JOSM, Python, and Osmium setup.
+
+In simple terms:
+
+> **Docker helps make the QA environment consistent from one computer to another.**
+
+---
+
+## Trust and limitations
+
+QA Buddy is designed to provide evidence, not false certainty.
+
+It does **not** claim:
+
+- that every OSM error will be detected
+- that every JOSM warning is actually a mapping mistake
+- that a task with no findings is automatically perfect
+- that automated QA can replace a human validator
+
+Instead:
+
+> **QA Buddy detects → the PM reviews the evidence → validators make the final decision.**
+
+The tool also keeps raw findings, logs, input information, and derived task-level results so that a QA run can be inspected later.
+
+---
+
+## Example: HOT TM Project 63564
+
+A real Windows end-to-end run was completed successfully for HOT TM Project **63564**.
+
+The run processed:
+
+- **60 task features**
+- a readable Geofabrik PBF
+- AOI clipping with Osmium
+- JOSM/Jython validation
+- **78 raw JOSM findings**
+- task-level QA summaries
+- the HTML report and interactive map
+
+The run also demonstrated why task-level output is useful: the raw JOSM findings are technical details, while the PM primarily needs to know **where to focus human review**.
+
+---
+
+## Development status
+
+The project includes automated checks for:
+
+- Python syntax
+- QA aggregation and task-priority logic
+- report/map generation
+- Docker image building
+
+This is an **unofficial tool under active development**. Real-world testing and skeptical review are encouraged.
+
+If something looks wrong, please treat the result as a signal to investigate—not as an unquestionable answer.

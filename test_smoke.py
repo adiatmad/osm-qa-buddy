@@ -18,7 +18,10 @@ def test_task_aggregation_and_report():
         report = tmp_path / "report.html"
         map_path = tmp_path / "map.html"
         metadata = tmp_path / "run_metadata.json"
-        tasks_data = {"type": "FeatureCollection", "features": [feature({"type": "Polygon", "coordinates": [[[0,0],[2,0],[2,2],[0,2],[0,0]]]}, {"taskId": 56})]}
+        tasks_data = {"type": "FeatureCollection", "features": [
+            feature({"type": "Polygon", "coordinates": [[[0,0],[2,0],[2,2],[0,2],[0,0]]]}, {"taskId": 56, "taskStatus": "VALIDATED"}),
+            feature({"type": "Polygon", "coordinates": [[[2,0],[4,0],[4,2],[2,2],[2,0]]]}, {"taskId": 23, "taskStatus": "BADIMAGERY"}),
+        ]}
         errors_data = {"type": "FeatureCollection", "features": [
             feature({"type":"Point","coordinates":[0.5,0.5]}, {"severity":"Errors","object_id":"way/1","rule":"MapCSS"}),
             feature({"type":"Point","coordinates":[1,1]}, {"severity":"Warnings","object_id":"way/1","rule":"MapCSS"}),
@@ -44,21 +47,30 @@ def test_task_aggregation_and_report():
             summary = aggregate_errors_to_tasks(str(tasks), str(errors))
             result = json.loads(Path(summary).read_text(encoding="utf-8"))
             props = result["features"][0]["properties"]
+            bad_props = result["features"][1]["properties"]
             assert props["qa_finding_count"] == 3
             assert props["qa_unique_osm_object_count"] == 2
             assert props["qa_rules_involved"] == ["MapCSS", "TagChecker"]
             assert props["qa_error_count"] == 1
             assert props["qa_warning_count"] == 2
+            assert props["qa_task_status"] == "VALIDATED"
+            assert props["qa_badimagery"] is False
+            assert bad_props["qa_task_status"] == "BADIMAGERY"
+            assert bad_props["qa_badimagery"] is True
             generate_report(str(errors), str(summary), str(report), str(map_path), str(metadata))
             html = report.read_text(encoding="utf-8")
             map_html = map_path.read_text(encoding="utf-8")
             assert "Errors:</b> 1" in html
             assert "Warnings:</b> 2" in html
+            assert "BADIMAGERY tasks</div>" in html
+            assert "1 task marked BADIMAGERY" in html
+            assert "Please review the imagery and confirm whether the task can reasonably be mapped." in html
             assert "Human review required" in html
             assert "JOSM tested version: 19613" in html
             assert "63564" in html
             assert "abc123" in html
-            assert "taskId" in map_html
+            assert "BADIMAGERY" in map_html
+            assert "qa_task_status" in map_html
             assert "Unique OSM objects:" in map_html
         finally:
             orchestrator.WORK_DIR = original_work_dir

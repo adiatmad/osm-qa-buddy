@@ -34,7 +34,7 @@ Priority areas / tasks
 Human review
 ```
 
-You also need a **Windows computer with Docker Desktop installed and running**.
+This has currently been tested end-to-end on **Windows with Docker**. Mac and Linux users are welcome to try it and report their results so we can improve cross-platform support.
 
 ---
 
@@ -254,10 +254,11 @@ If these checks fail, QA stops before producing a QA result.
 
 You need:
 
-- Windows
 - Python 3 with Tkinter
 - Docker Desktop
 - Internet access for the manual source downloads and JOSM/HOT validation rules
+
+**Current platform status:** end-to-end testing has been completed on Windows with Docker. Mac and Linux users are welcome to try the workflow and report results so cross-platform support can be improved.
 
 You **do not** need to install these locally:
 
@@ -326,6 +327,7 @@ The project includes automated checks for:
 - QA aggregation and task-priority logic
 - report/map generation
 - Docker image building
+- machine-aware JVM RAM policy
 
 This is an **unofficial tool under active development**. Real-world testing and skeptical review are encouraged.
 

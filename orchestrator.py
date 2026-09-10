@@ -104,6 +104,17 @@ def _normalize_severity(value):
     return value
 
 
+def _finding_key(finding):
+    """Identity for exact duplicate reporting; raw findings remain untouched."""
+    return (
+        str(finding.get("severity") or "UNKNOWN"),
+        str(finding.get("rule") or "Unknown"),
+        str(finding.get("message") or ""),
+        str(finding.get("object_id") or ""),
+        tuple(finding.get("coordinates") or ()),
+    )
+
+
 def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     if not os.path.exists(tasks_geojson_path) or not os.path.exists(errors_geojson_path):
         raise FileNotFoundError("Task grid or QA errors output is missing, so task-level summary cannot be generated.")
@@ -121,9 +132,11 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
         props = feature.get("properties", {})
         error_points.append({
             "point": Point(coords[0], coords[1]),
+            "coordinates": coords,
             "severity": props.get("severity", "UNKNOWN"),
             "object_id": props.get("object_id", ""),
             "rule": props.get("rule", "Unknown"),
+            "message": props.get("message", ""),
         })
 
     for task_feat in tasks_data.get("features", []):
@@ -134,12 +147,14 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
         unknown_count = len(findings) - error_count - warning_count
         unique_objects = {finding["object_id"] for finding in findings if finding["object_id"]}
         rules = {finding["rule"] for finding in findings if finding["rule"]}
+        unique_findings = {_finding_key(finding) for finding in findings}
 
         props = task_feat.setdefault("properties", {})
         task_status = str(props.get("taskStatus") or "").strip().upper()
         props["qa_task_status"] = task_status or "UNKNOWN"
         props["qa_badimagery"] = task_status == "BADIMAGERY"
         props["qa_finding_count"] = len(findings)
+        props["qa_unique_finding_count"] = len(unique_findings)
         props["qa_unique_osm_object_count"] = len(unique_objects)
         props["qa_rules_involved"] = sorted(rules)
         props["qa_error_count"] = error_count

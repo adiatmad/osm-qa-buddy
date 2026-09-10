@@ -187,6 +187,7 @@ class App(tk.Tk):
                 line = raw_line.rstrip("\r\n")
                 log_lines.append(line)
                 self.after(0, lambda text=line: self._append_log(text + "\n"))
+                self.after(0, lambda text=line: self._update_live_status(text))
             process.stdout.close()
             returncode = process.wait()
             log_path = os.path.join(output_dir, "qa_run.log")
@@ -197,6 +198,38 @@ class App(tk.Tk):
         except Exception as exc:
             message = str(exc)
             self.after(0, lambda: self._native_failed(message))
+
+    def _update_live_status(self, line):
+        match = re.search(r"\[(\d+)/(\d+)\] Running (.+?)\.\.\.", line)
+        if match:
+            current = int(match.group(1))
+            total = int(match.group(2))
+            rule = match.group(3)
+            base = 40.0
+            span = 55.0
+            self.progress.set(base + span * (current - 1) / total)
+            self.status.set("Running " + rule + "…")
+            return
+        match = re.search(r"Processing objects (\d+)-(\d+)/(\d+) \(([0-9.]+)%\)", line)
+        if match:
+            start = int(match.group(1))
+            end = int(match.group(2))
+            total_objects = int(match.group(3))
+            percent = float(match.group(4))
+            validator_match = re.search(r"Running (.+?)\.\.\.", self.check_text.get("1.0", "end"))
+            rule = "Crossing ways" if "CrossingWays" in line or "Running Ways" in self.check_text.get("1.0", "end") else "Current validator"
+            validator_match = re.findall(r"\[(\d+)/(\d+)\] Running (.+?)\.\.\.", self.check_text.get("1.0", "end"))
+            if validator_match:
+                current, total, rule = validator_match[-1]
+                current = int(current)
+                total = int(total)
+            else:
+                current, total = 11, 13
+            base = 40.0
+            span = 55.0
+            self.progress.set(base + span * ((current - 1) + percent / 100.0) / total)
+            elapsed_text = ""
+            self.status.set("Running " + rule + ": " + str(percent) + "% (" + str(end) + "/" + str(total_objects) + " objects)")
 
     def _native_done(self, output_dir, log_path):
         self.progress.set(100)

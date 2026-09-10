@@ -115,6 +115,17 @@ def _finding_key(finding):
     )
 
 
+def _priority_for_task(finding_count, unique_finding_count, unique_object_count, badimagery):
+    """Explainable PM triage signal; this is prioritization, not a quality score."""
+    if badimagery or unique_object_count >= 5 or unique_finding_count >= 5:
+        return "HIGH"
+    if unique_object_count >= 2 or unique_finding_count >= 2:
+        return "MEDIUM"
+    if finding_count >= 1:
+        return "LOW"
+    return "NONE"
+
+
 def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     if not os.path.exists(tasks_geojson_path) or not os.path.exists(errors_geojson_path):
         raise FileNotFoundError("Task grid or QA errors output is missing, so task-level summary cannot be generated.")
@@ -139,9 +150,13 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
             "message": props.get("message", ""),
         })
 
+    assigned_count = 0
+    unassigned_findings = []
+
     for task_feat in tasks_data.get("features", []):
         task_poly = shape(task_feat["geometry"])
         findings = [error for error in error_points if task_poly.covers(error["point"])]
+        assigned_count += len(findings)
         error_count = sum(1 for finding in findings if _normalize_severity(finding["severity"]) == "ERROR")
         warning_count = sum(1 for finding in findings if _normalize_severity(finding["severity"]) == "WARNING")
         unknown_count = len(findings) - error_count - warning_count
@@ -151,8 +166,9 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
 
         props = task_feat.setdefault("properties", {})
         task_status = str(props.get("taskStatus") or "").strip().upper()
+        badimagery = task_status == "BADIMAGERY"
         props["qa_task_status"] = task_status or "UNKNOWN"
-        props["qa_badimagery"] = task_status == "BADIMAGERY"
+        props["qa_badimagery"] = badimagery
         props["qa_finding_count"] = len(findings)
         props["qa_unique_finding_count"] = len(unique_findings)
         props["qa_unique_osm_object_count"] = len(unique_objects)
@@ -161,6 +177,35 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
         props["qa_warning_count"] = warning_count
         props["qa_unknown_severity_count"] = unknown_count
         props["qa_total_issues"] = len(findings)
+        props["qa_priority"] = _priority_for_task(
+            len(findings), len(unique_findings), len(unique_objects), badimagery
+        )
+
+    # Do not silently force a finding into a task when its representative point
+    # does not fall inside any task polygon. Keep the raw finding in qa_errors.geojson
+    # and expose the accounting gap for auditability.
+    for error in error_points:
+        if not any(shape(task_feat["geometry"]).covers(error["point"]) for task_feat in tasks_data.get("features", [])):
+            unassigned_findings.append(error)
+
+    tasks_data["qa_summary"] = {
+        "raw_josm_finding_count": len(error_points),
+        "task_associated_finding_count": assigned_count,
+        "unassigned_finding_count": len(unassigned_findings),
+        "task_associated_unique_finding_count": len({
+            _finding_key(error)
+            for task_feat in tasks_data.get("features", [])
+            for error in error_points
+            if shape(task_feat["geometry"]).covers(error["point"])
+        }),
+        "priority_definition": {
+            "HIGH": "BADIMAGERY or at least 5 unique findings or 5 unique OSM objects",
+            "MEDIUM": "2-4 unique findings or 2-4 unique OSM objects",
+            "LOW": "1 raw finding with no HIGH/MEDIUM signal",
+            "NONE": "No QA finding signal and not BADIMAGERY",
+        },
+        "human_review_required": True,
+    }
 
     summary_path = os.path.join(WORK_DIR, "task_grid_qa_summary.geojson")
     with open(summary_path, "w", encoding="utf-8") as f:
@@ -170,6 +215,9 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
         if feature.get("properties", {}).get("qa_badimagery")
     )
     print(f"  -> BADIMAGERY tasks detected: {badimagery_count}")
+    print(f"  -> Raw JOSM findings: {len(error_points)}")
+    print(f"  -> Task-associated findings: {assigned_count}")
+    print(f"  -> Unassigned findings: {len(unassigned_findings)}")
     print(f"  -> Final Task Grid QA Summary saved to: {summary_path}")
     return summary_path
 

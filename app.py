@@ -8,6 +8,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from memory import automatic_ram_gb, maximum_manual_ram_gb, total_memory_gb, validate_ram_gb, MIN_RAM_GB
+
 GEOFABRIK_URL = "https://download.geofabrik.de/"
 TM_API_BASE = "https://tasking-manager-production-api.hotosm.org/api/v2/projects/"
 
@@ -25,9 +27,13 @@ class App(tk.Tk):
         self.pbf_path = tk.StringVar()
         self.status = tk.StringVar(value="Enter a HOT TM Project ID to begin.")
         self.progress = tk.DoubleVar(value=0)
+        self.ram_mode = tk.StringVar(value="Automatic")
+        self.ram_gb = tk.StringVar(value="2")
+        self.ram_hint = tk.StringVar(value="Automatic RAM is recommended.")
         self.aoi_url = self.tasks_url = None
 
         self._build_ui()
+        self._update_ram_controls()
 
     def _build_ui(self):
         root = ttk.Frame(self, padding=12)
@@ -63,6 +69,18 @@ class App(tk.Tk):
         self.run_button = ttk.Button(action, text="START 3RD PASS VALIDATION", command=self.start_validation, state="disabled")
         self.run_button.pack(anchor="w", ipadx=14, ipady=6)
 
+        advanced = ttk.LabelFrame(action, text="Advanced settings (optional)", padding=6)
+        advanced.pack(fill="x", pady=(8, 0))
+        ram_row = ttk.Frame(advanced); ram_row.pack(fill="x")
+        ttk.Label(ram_row, text="JVM RAM:").pack(side="left")
+        self.ram_mode_combo = ttk.Combobox(ram_row, textvariable=self.ram_mode, values=("Automatic", "Manual"), state="readonly", width=12)
+        self.ram_mode_combo.pack(side="left", padx=6)
+        ttk.Label(ram_row, text="GB:").pack(side="left")
+        self.ram_spin = ttk.Spinbox(ram_row, from_=MIN_RAM_GB, to=16, textvariable=self.ram_gb, width=6)
+        self.ram_spin.pack(side="left", padx=6)
+        self.ram_mode_combo.bind("<<ComboboxSelected>>", lambda _event: self._update_ram_controls())
+        ttk.Label(advanced, textvariable=self.ram_hint, wraplength=680).pack(anchor="w", pady=(4, 0))
+
         checks = ttk.LabelFrame(root, text="5. Validation status / live log", padding=8)
         checks.pack(fill="both", expand=True)
         log_frame = ttk.Frame(checks); log_frame.pack(fill="both", expand=True)
@@ -73,6 +91,28 @@ class App(tk.Tk):
         scrollbar.pack(side="right", fill="y")
         ttk.Label(root, textvariable=self.status).pack(fill="x", pady=(6, 3))
         ttk.Progressbar(root, variable=self.progress, maximum=100).pack(fill="x")
+
+    def _update_ram_controls(self):
+        manual = self.ram_mode.get() == "Manual"
+        self.ram_spin.configure(state="normal" if manual else "disabled")
+        try:
+            total_gb = total_memory_gb()
+            if manual:
+                max_ram = maximum_manual_ram_gb(total_gb)
+                self.ram_hint.set(
+                    f"Manual override: {MIN_RAM_GB}–{max_ram} GB is allowed on this machine. Automatic is recommended."
+                )
+                current = int(self.ram_gb.get())
+                if current > max_ram:
+                    self.ram_gb.set(str(max_ram))
+            else:
+                auto = automatic_ram_gb(total_gb)
+                self.ram_gb.set(str(auto))
+                self.ram_hint.set(
+                    f"Automatic: about {auto} GB for a machine with {total_gb:.1f} GB physical RAM. Recommended for most users."
+                )
+        except Exception:
+            self.ram_hint.set("RAM will be checked before the QA run.")
 
     def _file_row(self, parent, label, variable, row, kind):
         ttk.Label(parent, text=label, width=17).grid(row=row, column=0, sticky="w", pady=3)
@@ -120,14 +160,29 @@ class App(tk.Tk):
         if ready:
             self.status.set("All 3 files selected. Click START 3RD PASS VALIDATION.")
 
+    def _resolve_ram_for_run(self):
+        total_gb = total_memory_gb()
+        if self.ram_mode.get() == "Automatic":
+            return automatic_ram_gb(total_gb), "automatic"
+        value = self.ram_gb.get().strip()
+        ok, message = validate_ram_gb(value, total_gb)
+        if not ok:
+            raise ValueError(message)
+        return int(value), "manual"
+
     def start_validation(self):
         if not self._basic_inputs_ok():
             messagebox.showerror("Input check failed", "Please select the Project Boundary, Task Grid, and Geofabrik PBF files first.")
             return
+        try:
+            ram_gb, ram_mode = self._resolve_ram_for_run()
+        except Exception as exc:
+            messagebox.showerror("RAM setting check failed", str(exc))
+            return
         self.run_button.configure(state="disabled")
-        self.status.set("Starting 3rd-pass validation…")
+        self.status.set(f"Starting 3rd-pass validation with {ram_gb} GB JVM RAM ({ram_mode})…")
         self.progress.set(30)
-        self._set_check_text("STARTING 3RD PASS VALIDATION\n\nLOCAL INPUT CHECKS\n" + self._basic_checks() + "\n")
+        self._set_check_text("STARTING 3RD PASS VALIDATION\n\nLOCAL INPUT CHECKS\n" + self._basic_checks() + f"\n\nJVM RAM: {ram_gb} GB ({ram_mode})\n")
         if not self._filename_patterns_ok():
             self.status.set("Filename check failed.")
             self.progress.set(0)
@@ -137,7 +192,7 @@ class App(tk.Tk):
             return
         self.status.set("Docker is running the authoritative pre-flight checks…")
         self.progress.set(40)
-        threading.Thread(target=self._docker_worker, daemon=True).start()
+        threading.Thread(target=self._docker_worker, args=(ram_gb, ram_mode), daemon=True).start()
 
     def _basic_checks(self):
         lines = []
@@ -157,7 +212,7 @@ class App(tk.Tk):
         )
         return all(re.search(pattern, os.path.basename(path), flags=re.IGNORECASE) for path, pattern in patterns)
 
-    def _docker_worker(self):
+    def _docker_worker(self, ram_gb, ram_mode):
         try:
             repo_dir = os.path.dirname(os.path.abspath(__file__))
             output_dir = os.path.join(repo_dir, "osm_qa_buddy_results", f"project_{self.project_id.get().strip()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
@@ -166,7 +221,7 @@ class App(tk.Tk):
             for source, target in ((self.aoi_path.get(), "/data/input/project_aoi.geojson"), (self.tasks_path.get(), "/data/input/project_tasks.geojson"), (self.pbf_path.get(), "/data/input/region.osm.pbf")):
                 mounts += ["--mount", f"type=bind,source={os.path.abspath(source)},target={target},readonly"]
             mounts += ["--mount", f"type=bind,source={os.path.abspath(output_dir)},target=/data/output"]
-            command = ["docker", "run", "--rm", *mounts, "-e", f"QABOT_PROJECT_ID={self.project_id.get().strip()}", "qabot", "/data/input/region.osm.pbf", "/data/input/project_aoi.geojson", "/data/input/project_tasks.geojson", "/data/output"]
+            command = ["docker", "run", "--rm", *mounts, "-e", f"QABOT_PROJECT_ID={self.project_id.get().strip()}", "-e", f"QABOT_JAVA_XMX_GB={ram_gb}", "qabot", "/data/input/region.osm.pbf", "/data/input/project_aoi.geojson", "/data/input/project_tasks.geojson", "/data/output"]
             self.after(0, lambda: self._append_log("\nDOCKER / QA LIVE LOG\n" + "=" * 80 + "\n"))
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir)
             log_lines = []

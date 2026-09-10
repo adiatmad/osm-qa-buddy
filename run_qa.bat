@@ -4,7 +4,7 @@ setlocal
 cd /d "%~dp0"
 echo ========================================
 echo OSM QA Buddy - Native Windows
- echo ========================================
+echo ========================================
 echo.
 
 where python >nul 2>&1

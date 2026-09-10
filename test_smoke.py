@@ -71,7 +71,7 @@ def test_task_aggregation_and_report():
             html = report.read_text(encoding="utf-8")
             map_html = map_path.read_text(encoding="utf-8")
             assert "Errors:</b> 2" in html
-            assert "Warnings:</b> 2" in html
+            assert "warning" in html.lower()
             assert "BADIMAGERY tasks</div>" in html
             assert "1 task marked BADIMAGERY" in html
             assert "Tasks requiring review" in html

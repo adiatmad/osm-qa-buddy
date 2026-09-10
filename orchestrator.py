@@ -5,6 +5,8 @@ import os
 import shutil
 import subprocess
 import sys
+import urllib.request
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -17,6 +19,7 @@ WORK_DIR = os.environ.get("QABOT_WORK_DIR", "/data/work")
 QA_BUDDY_VERSION = "0.1.0"
 JOSM_VERSION = "19613"
 JYTHON_VERSION = "2.7.3"
+HOT_RULES_URL = "https://josm.openstreetmap.de/josmfile?page=Rules/ValidatingBuildingsInHOTTMProjects&zip=1"
 
 
 def _sha256(path):
@@ -71,6 +74,43 @@ def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_
     Path(output_path).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"  -> Run metadata saved to: {output_path}")
     return output_path
+
+
+def prepare_hot_rules():
+    """Download HOT TM MapCSS rules with Python 3 before Jython/JOSM starts."""
+    extract_path = os.path.join(WORK_DIR, "hot_rules")
+    if os.path.isdir(extract_path) and any(
+        filename.endswith(".mapcss")
+        for _, _, files in os.walk(extract_path)
+        for filename in files
+    ):
+        print("[*] HOT TM MapCSS rules already prepared.")
+        return extract_path
+
+    os.makedirs(extract_path, exist_ok=True)
+    zip_path = os.path.join(WORK_DIR, "hot_building_rules.zip")
+    print("[*] Downloading HOT TM MapCSS rules with Python 3...")
+    try:
+        with urllib.request.urlopen(HOT_RULES_URL, timeout=60) as response, open(zip_path, "wb") as output:
+            shutil.copyfileobj(response, output)
+    except Exception as exc:
+        raise RuntimeError(f"Could not download HOT TM MapCSS rules:\n{exc}") from exc
+
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(extract_path)
+    except zipfile.BadZipFile as exc:
+        raise RuntimeError(f"Downloaded HOT TM MapCSS rules are not a valid ZIP file:\n{exc}") from exc
+
+    if not any(
+        filename.endswith(".mapcss")
+        for _, _, files in os.walk(extract_path)
+        for filename in files
+    ):
+        raise RuntimeError("HOT TM MapCSS rules ZIP was downloaded, but no .mapcss rule file was found.")
+
+    print(f"  -> HOT TM MapCSS rules prepared in {extract_path}")
+    return extract_path
 
 
 def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
@@ -254,6 +294,7 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None):
     tasks = os.path.join(WORK_DIR, "project_tasks.geojson")
     pbf = os.path.join(WORK_DIR, "region.osm.pbf")
     clip_pbf_with_osmium(aoi, pbf)
+    prepare_hot_rules()
     run_josm_qa_bot()
     errors = os.path.join(WORK_DIR, "qa_errors.geojson")
     summary = aggregate_errors_to_tasks(tasks, errors)

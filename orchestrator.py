@@ -10,6 +10,7 @@ from pathlib import Path
 
 from shapely.geometry import Point, shape
 
+from memory import automatic_ram_gb, validate_ram_gb
 from preflight import normalize_aoi_for_osmium, validate_inputs
 from report import generate_report
 
@@ -36,6 +37,20 @@ def _command_version(command):
         return f"unavailable: {exc}"
 
 
+def _resolve_ram_gb():
+    configured = os.environ.get("QABOT_JAVA_XMX_GB", "").strip()
+    if not configured:
+        return automatic_ram_gb(), "automatic"
+    try:
+        ram_gb = int(configured)
+    except ValueError as exc:
+        raise RuntimeError("QABOT_JAVA_XMX_GB must be a whole number of GB.") from exc
+    ok, message = validate_ram_gb(ram_gb)
+    if not ok:
+        raise RuntimeError(message)
+    return ram_gb, "manual"
+
+
 def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_utc):
     inputs = {}
     for label, path in (("project_boundary", aoi_path), ("task_grid", tasks_path), ("geofabrik_pbf", pbf_path)):
@@ -46,11 +61,16 @@ def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_
             "sha256": _sha256(path),
         }
 
+    ram_gb, ram_mode = _resolve_ram_gb()
     metadata = {
         "qa_buddy_version": QA_BUDDY_VERSION,
         "project_id": os.environ.get("QABOT_PROJECT_ID") or None,
         "run_started_utc": run_started_utc,
         "validation_engine": "JOSM headless validator",
+        "jvm_memory": {
+            "mode": ram_mode,
+            "xmx_gb": ram_gb,
+        },
         "toolchain": {
             "josm_tested_version": JOSM_VERSION,
             "jython_version": JYTHON_VERSION,
@@ -88,8 +108,10 @@ def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
 
 
 def run_josm_qa_bot():
+    ram_gb, ram_mode = _resolve_ram_gb()
+    print(f"[*] JVM memory: {ram_gb} GB ({ram_mode})")
     print(f"[*] Executing JOSM {JOSM_VERSION} Headless QA Bot (bot.py)...")
-    cmd = ["java", "-Xmx10g", "-cp", "/app/josm-tested.jar:/app/jython.jar", "org.python.util.jython", "/app/bot.py"]
+    cmd = ["java", f"-Xmx{ram_gb}g", "-cp", "/app/josm-tested.jar:/app/jython.jar", "org.python.util.jython", "/app/bot.py"]
     result = subprocess.run(cmd, cwd=WORK_DIR)
     if result.returncode != 0:
         raise RuntimeError("bot.py execution failed. Check the Docker console output for the failing validator.")

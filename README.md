@@ -2,25 +2,23 @@
 
 **An unofficial companion for HOT Tasking Manager projects, built to support third-pass QA.**
 
-OSM QA Buddy helps a HOT Tasking Manager Project Manager answer a simple question:
+OSM QA Buddy helps a HOT Tasking Manager Project Manager answer one simple question:
 
-> **“After the normal validation is finished, where should my validators look again?”**
+> **“After normal validation is finished, where should my validators look again?”**
 
-It runs established JOSM validation rules against the completed project data, connects potential issues back to Tasking Manager tasks, and highlights the tasks that deserve human review.
+It runs established JOSM validation rules against completed project data, connects potential issues to Tasking Manager tasks, and highlights areas that deserve human review.
 
 **QA Buddy detects. The PM decides.**
 
 ---
 
-## What problem does it solve?
+## Before you start — one critical prerequisite
 
-A HOT Tasking Manager project can reach **100% validated** and still contain quality issues that are easy to miss.
+**The HOT Tasking Manager project should already be completed and 100% validated.**
 
-A PM normally does not want to inspect every task again. QA Buddy provides an additional signal that can help the PM focus the next round of human review.
+QA Buddy is a **third-pass** check. It is not intended to replace the normal mapping and validation workflow.
 
-It is **not an official HOT Tasking Manager product** and it does **not replace human validation**.
-
-Think of it as a **third-pass QA instrument**:
+The basic workflow is:
 
 ```text
 Mapping
@@ -31,10 +29,12 @@ Normal validation
    ↓
 OSM QA Buddy
    ↓
-Potential problem areas
+Priority areas / tasks
    ↓
 Human review
 ```
+
+You also need a **Windows computer with Docker Desktop installed and running**.
 
 ---
 
@@ -62,13 +62,13 @@ QA Buddy uses this ID to open the official Tasking Manager download links.
 
 ### 3. Download the project boundary
 
-Click the **HOT TM Project Boundary** button.
+Click **HOT TM Project Boundary**.
 
 Your browser opens the official Tasking Manager download link. Download the file yourself.
 
 ### 4. Download the task grid
 
-Click the **HOT TM Task Grid** button and download the file yourself.
+Click **HOT TM Task Grid** and download the file yourself.
 
 ### 5. Download the OSM data
 
@@ -94,47 +94,27 @@ Click:
 
 **START 3RD PASS VALIDATION**
 
-QA Buddy then checks the files, prepares the OSM data, and runs JOSM validation inside Docker.
+QA Buddy checks the files, prepares the OSM data, and runs JOSM validation inside Docker.
 
 ### 8. Use the result
 
-The most useful output for a PM is:
+The main output for a PM is:
 
 **`task_grid_qa_summary.geojson`**
 
 Open it in your usual GIS/map workflow and use it to identify **priority tasks or areas for validators to review**.
 
-That is the main idea. You do not need to understand every technical finding to use the result.
+That's the main idea. **You do not need to understand every technical finding to use the result.**
 
 ---
 
-## What happens behind the scenes?
+## What problem does it solve?
 
-You do not need to understand this part to use the tool, but this is what QA Buddy does:
+A HOT Tasking Manager project can reach **100% validated** and still contain quality issues that are easy to miss.
 
-```text
-HOT TM Project ID
-        ↓
-Download links opened for you
-        ↓
-You select the downloaded files
-        ↓
-Basic file checks
-        ↓
-Docker pre-flight checks
-        ↓
-Osmium clips OSM data to the project area
-        ↓
-JOSM + Jython run validation rules
-        ↓
-Findings are connected to Tasking Manager tasks
-        ↓
-Task-level QA GeoJSON
-        ↓
-Map + report + audit information
-```
+A PM normally does not want to inspect every task again. QA Buddy provides an additional automated signal that helps the PM focus the next round of human review.
 
-The important design principle is **no silent failure**: if the input data does not look right or the QA pipeline cannot run, the process should stop and tell you rather than quietly producing a misleading result.
+It is **not an official HOT Tasking Manager product** and it **does not replace human validation**.
 
 ---
 
@@ -144,7 +124,7 @@ QA Buddy is not another mapping editor and it is not a replacement for validator
 
 It is an additional automated check after the normal Tasking Manager workflow.
 
-For example, QA Buddy may identify things such as:
+For example, QA Buddy may identify:
 
 - suspicious tagging
 - duplicated nodes
@@ -159,7 +139,7 @@ A human still makes the final decision.
 
 ---
 
-## Main output
+## The result you actually care about
 
 ### `task_grid_qa_summary.geojson`
 
@@ -177,9 +157,11 @@ It keeps the Tasking Manager task grid and adds QA information to each task, suc
 - BADIMAGERY status
 - QA priority
 
-The goal is to make it easy to answer:
+The goal is simple:
 
-> **“Which tasks should my validators look at first?”**
+> **Find the tasks that deserve attention first.**
+
+The PM does not need to reconcile raw JOSM findings or understand the internal processing to use this output.
 
 ### Other outputs
 
@@ -191,6 +173,36 @@ The goal is to make it easy to answer:
 | `task_grid_qa_summary.geojson` | Task-level QA result for PM use |
 | `sample.osm` | OSM data clipped to the project area |
 | `qa_run.log` | Full Docker/JOSM processing log |
+
+---
+
+## What happens behind the scenes?
+
+You do **not** need to understand this part to use the tool.
+
+```text
+HOT TM Project ID
+        ↓
+Download links opened for you
+        ↓
+You select the downloaded files
+        ↓
+File checks
+        ↓
+Docker pre-flight checks
+        ↓
+Osmium clips OSM data to the project area
+        ↓
+JOSM + Jython run validation rules
+        ↓
+Findings are connected to Tasking Manager tasks
+        ↓
+Task-level QA GeoJSON
+        ↓
+Map + report + audit information
+```
+
+The important design principle is **no silent failure**: if the input data does not look right or the QA pipeline cannot run, the process should stop and tell you rather than quietly producing a misleading result.
 
 ---
 
@@ -302,7 +314,7 @@ The run processed:
 - task-level QA summaries
 - the HTML report and interactive map
 
-The run also demonstrated why task-level output is useful: the raw JOSM findings are technical details, while the PM primarily needs to know **where to focus human review**.
+The run demonstrated why task-level output is useful: the raw JOSM findings are technical details, while the PM primarily needs to know **where to focus human review**.
 
 ---
 

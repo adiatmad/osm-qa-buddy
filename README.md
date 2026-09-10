@@ -87,6 +87,28 @@ java -version
 osmium --version
 ```
 
+> **Important:** QA Buddy needs Python **3.12+** for the setup/GUI. Osmium can come from a separate environment. The launcher intentionally prefers `py -3.12` over the currently active `python`, so an older Conda environment containing Osmium does not have to provide the Python version used by QA Buddy.
+
+### Recommended Windows setup for Osmium
+
+One practical way to get native Osmium on Windows is Conda/Miniconda with conda-forge:
+
+```powershell
+conda create -n osmium-tools -c conda-forge osmium-tool -y
+conda activate osmium-tools
+osmium --version
+```
+
+If this environment contains an older Python version, **do not try to upgrade that environment just to run QA Buddy**. Keep the environment for Osmium and let `run_qa.bat` find your installed Python 3.12+ through the Windows Python launcher.
+
+The launcher checks for a working Python 3.12+ interpreter in this order:
+
+1. `py -3.12`
+2. the active `python`, but only if it reports Python 3.12+
+3. otherwise it stops with a clear error
+
+This separation was tested on a Windows machine where `osmium-tool 1.19.1` was installed in a Conda environment using Python 3.11, while Python 3.12 was installed separately. QA Buddy successfully launched its GUI with `py -3.12` while retaining the Conda environment's PATH for Osmium.
+
 ### 2. Clone the repository
 
 ```powershell
@@ -100,18 +122,18 @@ cd osm-qa-buddy
 .\run_qa.bat
 ```
 
-The launcher checks Python, Java, and Osmium, then downloads the pinned JOSM and Jython files if they are not already present.
+The launcher selects a suitable Python 3.12+ interpreter, then `setup_native.py` checks Java and Osmium and downloads the pinned JOSM and Jython files if they are not already present.
 
 The pinned versions are:
 
 - **JOSM tested revision: 19613**
 - **Jython: 2.7.3**
 
-You can also run the GUI directly with:
+You can also run the setup and GUI directly with a known Python 3.12+ interpreter:
 
 ```powershell
-python setup_native.py
-python app.py
+py -3.12 setup_native.py
+py -3.12 app.py
 ```
 
 ### 4. Enter the HOT TM Project ID
@@ -306,6 +328,12 @@ QA Buddy pins the QA-side Java components for reproducibility:
 | Osmium | native host installation |
 
 `setup_native.py` downloads the pinned JOSM and Jython JARs into the local `tools/` directory. They are not committed to Git because they are binary dependencies.
+
+The JOSM download is SHA-256 verified before use. The expected digest for JOSM 19613 is:
+
+```text
+7bba9b5d5eb57db390672ddce571a67de9d5cf0b0e8fe610c4dbde15fbe59077
+```
 
 ---
 

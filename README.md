@@ -1,6 +1,7 @@
 # OSM QA Buddy
 
 **An unofficial companion for HOT Tasking Manager projects, built to support third-pass QA.**
+<img width="1132" height="937" alt="gambar" src="https://github.com/user-attachments/assets/b8532868-e509-41c1-9199-fca391a82415" />
 
 OSM QA Buddy helps a HOT Tasking Manager Project Manager answer one simple question:
 

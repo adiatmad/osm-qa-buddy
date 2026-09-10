@@ -8,6 +8,7 @@ from pathlib import Path
 JOSM_VERSION = "19613"
 JYTHON_VERSION = "2.7.3"
 TOOLS_DIR = Path(__file__).resolve().parent / "tools"
+REQUIREMENTS_FILE = Path(__file__).resolve().parent / "requirements.txt"
 JOSM_URL = f"https://josm.openstreetmap.de/download/josm-snapshot-{JOSM_VERSION}.jar"
 JYTHON_URL = f"https://repo1.maven.org/maven2/org/python/jython-standalone/{JYTHON_VERSION}/jython-standalone-{JYTHON_VERSION}.jar"
 JOSM_SHA256 = "7bba9b5d5eb57db390672ddce571a67de9d5cf0b0e8fe610c4dbde15fbe59077"
@@ -44,18 +45,44 @@ def command_exists(name):
     return shutil.which(name) is not None
 
 
+def ensure_python_dependencies():
+    """Install the small native-Python runtime dependency set when needed."""
+    if not REQUIREMENTS_FILE.is_file():
+        raise SystemExit("requirements.txt is missing from the QA Buddy repository.")
+
+    try:
+        import shapely
+        print(f"OK: Shapely {shapely.__version__} already installed")
+        return
+    except ImportError:
+        pass
+
+    print("Installing native Python dependencies...")
+    result = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(REQUIREMENTS_FILE)], check=False)
+    if result.returncode != 0:
+        raise SystemExit("Python dependency installation failed. Check the pip output above and try again.")
+
+    try:
+        import shapely
+        print(f"OK: Shapely {shapely.__version__} installed")
+    except ImportError as exc:
+        raise SystemExit("Shapely is still unavailable after dependency installation.") from exc
+
+
 def main():
     print("OSM QA Buddy — native Windows setup")
     print("====================================")
     if sys.version_info < (3, 12):
         raise SystemExit("Python 3.12 or newer is required.")
+    ensure_python_dependencies()
     if not command_exists("java"):
         raise SystemExit("Java was not found on PATH. Install a 64-bit Java runtime, then reopen PowerShell.")
     if not command_exists("osmium"):
         raise SystemExit("Osmium was not found on PATH. Install osmium-tool, then reopen PowerShell.")
     java = subprocess.run(["java", "-version"], capture_output=True, text=True)
     print((java.stderr or java.stdout).splitlines()[0] if (java.stderr or java.stdout) else "Java detected")
-    print("Osmium detected")
+    osmium = subprocess.run(["osmium", "--version"], capture_output=True, text=True)
+    print((osmium.stdout or osmium.stderr).splitlines()[0] if (osmium.stdout or osmium.stderr) else "Osmium detected")
     download(JOSM_URL, TOOLS_DIR / f"josm-{JOSM_VERSION}.jar", JOSM_SHA256)
     download(JYTHON_URL, TOOLS_DIR / f"jython-{JYTHON_VERSION}.jar")
     print(f"\nReady. JOSM {JOSM_VERSION} and Jython {JYTHON_VERSION} are prepared in {TOOLS_DIR}.")

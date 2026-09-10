@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
@@ -62,6 +63,15 @@ def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_
     return output_path
 
 
+def _update_run_metadata(path, **updates):
+    try:
+        metadata = json.loads(Path(path).read_text(encoding="utf-8"))
+        metadata.update(updates)
+        Path(path).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    except Exception as exc:
+        print(f"  -> Warning: could not update run metadata: {exc}")
+
+
 def prepare_hot_rules():
     extract_path = os.path.join(WORK_DIR, "hot_rules")
     if os.path.isdir(extract_path) and any(filename.endswith(".mapcss") for _, _, files in os.walk(extract_path) for filename in files):
@@ -80,6 +90,13 @@ def prepare_hot_rules():
     return extract_path
 
 
+def _osmium_fileinfo(path):
+    result = subprocess.run(["osmium", "fileinfo", "-e", path], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"Osmium could not inspect the extracted dataset:\n{result.stderr or result.stdout}")
+    return result.stdout or result.stderr
+
+
 def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
     output_osm_path = os.path.join(WORK_DIR, "sample.osm")
     normalized_aoi_path = os.path.join(WORK_DIR, "osmium_aoi.geojson")
@@ -87,15 +104,27 @@ def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
     print(f"[*] Clipping PBF ({os.path.basename(regional_pbf_path)}) using native Osmium...")
     result = subprocess.run(["osmium", "extract", "-p", normalized_aoi_path, regional_pbf_path, "-o", output_osm_path, "--overwrite"], capture_output=True, text=True)
     if result.returncode != 0: raise RuntimeError(f"Osmium extraction failed:\n{result.stderr or result.stdout}")
-    print(f"  -> Extracted project dataset saved to {output_osm_path}")
+    print("  -> Extracted project dataset:")
+    print(_osmium_fileinfo(output_osm_path))
+    print(f"  -> Saved to {output_osm_path}")
     return output_osm_path
 
 
 def run_josm_qa_bot(ram_gb):
     classpath = os.pathsep.join((str(JOSM_JAR), str(JYTHON_JAR)))
     print(f"[*] Executing native JOSM {JOSM_VERSION} + Jython {JYTHON_VERSION} with -Xmx{ram_gb}g...")
-    result = subprocess.run(["java", f"-Xmx{ram_gb}g", "-cp", classpath, "org.python.util.jython", str(REPO_DIR / "bot.py")], cwd=WORK_DIR)
-    if result.returncode != 0: raise RuntimeError("bot.py execution failed. Check the live log for the failing validator.")
+    print("    JOSM CrossingWays is a full-dataset spatial test; long periods without new log lines are expected.")
+    started = time.monotonic()
+    process = subprocess.Popen(["java", f"-Xmx{ram_gb}g", "-cp", classpath, "org.python.util.jython", str(REPO_DIR / "bot.py")], cwd=WORK_DIR)
+    last_heartbeat = started
+    while process.poll() is None:
+        time.sleep(30)
+        elapsed = int(time.monotonic() - started)
+        if elapsed - int(last_heartbeat - started) >= 30:
+            minutes, seconds = divmod(elapsed, 60)
+            print(f"    JOSM still running — elapsed {minutes}m {seconds:02d}s. Waiting for validator completion...")
+            last_heartbeat = time.monotonic()
+    if process.returncode != 0: raise RuntimeError("bot.py execution failed. Check the live log for the failing validator.")
 
 
 def _normalize_severity(value):
@@ -158,7 +187,8 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=2
         dst = os.path.join(WORK_DIR, name)
         if os.path.abspath(src) != os.path.abspath(dst): shutil.copy2(src, dst)
     aoi, tasks, pbf = (os.path.join(WORK_DIR, x) for x in ("project_aoi.geojson", "project_tasks.geojson", "region.osm.pbf"))
-    clip_pbf_with_osmium(aoi, pbf); prepare_hot_rules(); run_josm_qa_bot(ram_gb)
+    sample_path = clip_pbf_with_osmium(aoi, pbf); _update_run_metadata(metadata_path, extracted_dataset={"path": sample_path, "size_bytes": os.path.getsize(sample_path), "osmium_fileinfo": _osmium_fileinfo(sample_path)})
+    prepare_hot_rules(); run_josm_qa_bot(ram_gb)
     errors = os.path.join(WORK_DIR, "qa_errors.geojson"); summary = aggregate_errors_to_tasks(tasks, errors)
     report_path, map_path = os.path.join(WORK_DIR, "report.html"), os.path.join(WORK_DIR, "map.html")
     generate_report(errors, summary, report_path, map_path, metadata_path)

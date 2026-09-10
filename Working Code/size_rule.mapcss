@@ -1,0 +1,10 @@
+
+        meta {
+            title: "Custom Bot Rule (Oversize)";
+            version: "1.0";
+            description: "Detects buildings with an unreasonable size";
+        }
+        way[building][eval(area()) > 5000] {
+            throwWarning: tr("This building is too large (area exceeds 5000 sqm).");
+        }
+        

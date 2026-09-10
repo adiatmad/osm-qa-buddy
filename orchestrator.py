@@ -95,6 +95,15 @@ def run_josm_qa_bot():
         raise RuntimeError("bot.py execution failed. Check the Docker console output for the failing validator.")
 
 
+def _normalize_severity(value):
+    value = str(value or "UNKNOWN").upper()
+    if value in {"ERROR", "ERRORS"}:
+        return "ERROR"
+    if value in {"WARNING", "WARN", "WARNINGS"}:
+        return "WARNING"
+    return value
+
+
 def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     if not os.path.exists(tasks_geojson_path) or not os.path.exists(errors_geojson_path):
         raise FileNotFoundError("Task grid or QA errors output is missing, so task-level summary cannot be generated.")
@@ -120,27 +129,16 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     for task_feat in tasks_data.get("features", []):
         task_poly = shape(task_feat["geometry"])
         findings = [error for error in error_points if task_poly.covers(error["point"])]
-        def normalize_severity(value):
-            value = str(value or "UNKNOWN").upper()
-            if value in {"ERROR", "ERRORS"}:
-                return "ERROR"
-            if value in {"WARNING", "WARN", "WARNINGS"}:
-                return "WARNING"
-            return value
-
-        error_count = sum(
-            1 for finding in findings
-            if normalize_severity(finding["severity"]) == "ERROR"
-        )
-        warning_count = sum(
-            1 for finding in findings
-            if normalize_severity(finding["severity"]) == "WARNING"
-        )
+        error_count = sum(1 for finding in findings if _normalize_severity(finding["severity"]) == "ERROR")
+        warning_count = sum(1 for finding in findings if _normalize_severity(finding["severity"]) == "WARNING")
         unknown_count = len(findings) - error_count - warning_count
         unique_objects = {finding["object_id"] for finding in findings if finding["object_id"]}
         rules = {finding["rule"] for finding in findings if finding["rule"]}
 
         props = task_feat.setdefault("properties", {})
+        task_status = str(props.get("taskStatus") or "").strip().upper()
+        props["qa_task_status"] = task_status or "UNKNOWN"
+        props["qa_badimagery"] = task_status == "BADIMAGERY"
         props["qa_finding_count"] = len(findings)
         props["qa_unique_osm_object_count"] = len(unique_objects)
         props["qa_rules_involved"] = sorted(rules)
@@ -152,6 +150,11 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     summary_path = os.path.join(WORK_DIR, "task_grid_qa_summary.geojson")
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(tasks_data, f, indent=2)
+    badimagery_count = sum(
+        1 for feature in tasks_data.get("features", [])
+        if feature.get("properties", {}).get("qa_badimagery")
+    )
+    print(f"  -> BADIMAGERY tasks detected: {badimagery_count}")
     print(f"  -> Final Task Grid QA Summary saved to: {summary_path}")
     return summary_path
 

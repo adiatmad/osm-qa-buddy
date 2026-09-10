@@ -34,7 +34,7 @@ Priority areas / tasks
 Human review
 ```
 
-You also need a **Windows computer with Docker Desktop installed and running**.
+This has currently been tested end-to-end on **Windows with Docker**. Mac and Linux users are welcome to try it and report their results so we can improve cross-platform support.
 
 ---
 
@@ -42,43 +42,17 @@ You also need a **Windows computer with Docker Desktop installed and running**.
 
 The intended workflow is deliberately simple.
 
-### 1. Start QA Buddy
+### 1. Download the project data
 
-On Windows, run:
+QA Buddy intentionally lets you download the source files yourself. You need three files:
 
-```text
-run_qa.bat
-```
+1. **Project Boundary** — from the HOT Tasking Manager
+2. **Task Grid** — from the HOT Tasking Manager
+3. **OSM data** — a matching country or regional `.osm.pbf` from Geofabrik
 
-### 2. Enter the HOT TM Project ID
+Enter the HOT TM Project ID in QA Buddy and use the three download buttons to open the official download pages/links.
 
-For example:
-
-```text
-63564
-```
-
-QA Buddy uses this ID to open the official Tasking Manager download links.
-
-### 3. Download the project boundary
-
-Click **HOT TM Project Boundary**.
-
-Your browser opens the official Tasking Manager download link. Download the file yourself.
-
-### 4. Download the task grid
-
-Click **HOT TM Task Grid** and download the file yourself.
-
-### 5. Download the OSM data
-
-Click **Geofabrik Downloads**.
-
-Choose the appropriate country or region and download the matching `.osm.pbf` file.
-
-### 6. Select the three files
-
-Choose the files you downloaded:
+The expected filenames are:
 
 | File | Expected filename |
 |---|---|
@@ -88,15 +62,49 @@ Choose the files you downloaded:
 
 Windows duplicate filenames such as `(1)` are accepted.
 
-### 7. Start the third-pass validation
+### 2. Run QA Buddy locally
+
+The easiest way to launch it is from a local command line.
+
+Open **PowerShell** or **Command Prompt**, go to the folder where you cloned/downloaded the repository, and run:
+
+```powershell
+run_qa.bat
+```
+
+This builds the Docker image if needed and opens the QA Buddy GUI.
+
+If you prefer to start the GUI directly with Python, you can also run:
+
+```powershell
+python app.py
+```
+
+However, `run_qa.bat` is the recommended launcher because it also makes sure the Docker image is built before you start the application.
+
+### 3. Enter the HOT TM Project ID
+
+For example:
+
+```text
+63564
+```
+
+QA Buddy uses this ID to construct the official Tasking Manager download links.
+
+### 4. Select the three files
+
+Choose the Project Boundary, Task Grid, and Geofabrik PBF you downloaded.
+
+### 5. Start the third-pass validation
 
 Click:
 
 **START 3RD PASS VALIDATION**
 
-QA Buddy checks the files, prepares the OSM data, and runs JOSM validation inside Docker.
+QA Buddy checks the files, prepares the OSM data, and runs JOSM validation inside Docker. The GUI shows the live processing log.
 
-### 8. Use the result
+### 6. Use the result
 
 The main output for a PM is:
 
@@ -105,6 +113,48 @@ The main output for a PM is:
 Open it in your usual GIS/map workflow and use it to identify **priority tasks or areas for validators to review**.
 
 That's the main idea. **You do not need to understand every technical finding to use the result.**
+
+---
+
+## Testing a new computer before running a real project
+
+If you are testing QA Buddy on another computer, first verify the local prerequisites before downloading a large PBF or starting a real QA run.
+
+Open PowerShell and run:
+
+```powershell
+python --version
+docker --version
+docker info
+```
+
+You should see:
+
+- a working Python 3 installation
+- a Docker version
+- Docker Desktop responding successfully to `docker info`
+
+Then clone the repository and run the launcher:
+
+```powershell
+git clone https://github.com/adiatmad/osm-qa-buddy.git
+cd osm-qa-buddy
+run_qa.bat
+```
+
+If the Docker image builds successfully and the QA Buddy window opens, the main local application prerequisites are working.
+
+For a more explicit application-level check, run the automated tests from the repository folder:
+
+```powershell
+python -m py_compile app.py orchestrator.py memory.py preflight.py report.py run_wizard.py test_smoke.py test_memory.py
+python test_memory.py
+python test_smoke.py
+```
+
+A successful result from these commands verifies Python syntax, the RAM policy tests, and the existing QA/report smoke tests. The Docker build performed by `run_qa.bat` verifies that the container environment can be assembled.
+
+**You do not need to install Java, JOSM, Jython, Shapely, or Osmium on the host computer.** They are provided inside Docker for the QA run.
 
 ---
 
@@ -254,10 +304,11 @@ If these checks fail, QA stops before producing a QA result.
 
 You need:
 
-- Windows
 - Python 3 with Tkinter
 - Docker Desktop
 - Internet access for the manual source downloads and JOSM/HOT validation rules
+
+**Current platform status:** end-to-end testing has been completed on Windows with Docker. Mac and Linux users are welcome to try the workflow and report results so cross-platform support can be improved.
 
 You **do not** need to install these locally:
 

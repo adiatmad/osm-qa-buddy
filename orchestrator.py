@@ -129,7 +129,7 @@ def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
 
 def run_josm_qa_bot():
     print(f"[*] Executing JOSM {JOSM_VERSION} Headless QA Bot (bot.py)...")
-    cmd = ["java", "-Xmx10g", "-cp", "/app/josm-tested.jar:/app/jython.jar", "org.python.util.jython", "/app/bot.py"]
+    cmd = ["java", "-Xmx26g", "-cp", "/app/josm-tested.jar:/app/jython.jar", "org.python.util.jython", "/app/bot.py"]
     result = subprocess.run(cmd, cwd=WORK_DIR)
     if result.returncode != 0:
         raise RuntimeError("bot.py execution failed. Check the Docker console output for the failing validator.")

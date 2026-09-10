@@ -11,10 +11,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Python syntax
-        run: python3 -m py_compile app.py orchestrator.py preflight.py report.py run_wizard.py test_smoke.py
+        run: python3 -m py_compile app.py orchestrator.py setup_native.py preflight.py report.py run_wizard.py test_smoke.py native_smoke.py
       - name: Install test dependency
         run: python3 -m pip install shapely
       - name: Run smoke tests
         run: python3 test_smoke.py
+      - name: Run native workflow checks
+        run: python3 native_smoke.py
       - name: Build Docker image
         run: docker build -t qabot .

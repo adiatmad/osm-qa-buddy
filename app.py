@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import sys
 import threading
 import webbrowser
 from datetime import datetime
@@ -10,6 +11,7 @@ from tkinter import filedialog, messagebox, ttk
 
 GEOFABRIK_URL = "https://download.geofabrik.de/"
 TM_API_BASE = "https://tasking-manager-production-api.hotosm.org/api/v2/projects/"
+DEFAULT_RAM_GB = "24"
 
 
 class App(tk.Tk):
@@ -23,6 +25,7 @@ class App(tk.Tk):
         self.aoi_path = tk.StringVar()
         self.tasks_path = tk.StringVar()
         self.pbf_path = tk.StringVar()
+        self.ram_gb = tk.StringVar(value=DEFAULT_RAM_GB)
         self.status = tk.StringVar(value="Enter a HOT TM Project ID to begin.")
         self.progress = tk.DoubleVar(value=0)
         self.aoi_url = self.tasks_url = None
@@ -60,6 +63,11 @@ class App(tk.Tk):
 
         action = ttk.LabelFrame(root, text="4. Start validation", padding=8)
         action.pack(fill="x", pady=8)
+        ram_row = ttk.Frame(action); ram_row.pack(fill="x", pady=(0, 6))
+        ttk.Label(ram_row, text="Java/JOSM RAM (GB):").pack(side="left")
+        ttk.Entry(ram_row, textvariable=self.ram_gb, width=10).pack(side="left", padx=6)
+        ttk.Label(ram_row, text="Enter a whole number, e.g. 8, 16, 24, 32.").pack(side="left")
+        ttk.Label(action, text="RAM is passed directly to Java as -Xmx. Do not allocate more than your computer can spare.", wraplength=720).pack(anchor="w", pady=(0, 6))
         self.run_button = ttk.Button(action, text="START 3RD PASS VALIDATION", command=self.start_validation, state="disabled")
         self.run_button.pack(anchor="w", ipadx=14, ipady=6)
 
@@ -114,30 +122,37 @@ class App(tk.Tk):
         if url:
             webbrowser.open(url)
 
+    def _valid_ram(self):
+        value = self.ram_gb.get().strip()
+        return value.isdigit() and 1 <= int(value) <= 128
+
     def _update_run_state(self):
-        ready = all(Path(path.get()).is_file() for path in (self.aoi_path, self.tasks_path, self.pbf_path))
+        ready = all(Path(path.get()).is_file() for path in (self.aoi_path, self.tasks_path, self.pbf_path)) and self._valid_ram()
         self.run_button.configure(state="normal" if ready else "disabled")
         if ready:
-            self.status.set("All 3 files selected. Click START 3RD PASS VALIDATION.")
+            self.status.set("All 3 files selected and RAM setting is valid. Click START 3RD PASS VALIDATION.")
 
     def start_validation(self):
         if not self._basic_inputs_ok():
             messagebox.showerror("Input check failed", "Please select the Project Boundary, Task Grid, and Geofabrik PBF files first.")
             return
+        if not self._valid_ram():
+            messagebox.showerror("Invalid RAM", "Enter a whole number between 1 and 128 GB.")
+            return
         self.run_button.configure(state="disabled")
-        self.status.set("Starting 3rd-pass validation…")
+        self.status.set("Starting native Windows 3rd-pass validation…")
         self.progress.set(30)
-        self._set_check_text("STARTING 3RD PASS VALIDATION\n\nLOCAL INPUT CHECKS\n" + self._basic_checks() + "\n")
+        self._set_check_text("STARTING 3RD PASS VALIDATION\n\nLOCAL INPUT CHECKS\n" + self._basic_checks() + f"\n\nJava/JOSM RAM: {self.ram_gb.get().strip()} GB\n")
         if not self._filename_patterns_ok():
             self.status.set("Filename check failed.")
             self.progress.set(0)
             self._append_log("\nFAIL: Filename pattern check failed.\n")
             self.run_button.configure(state="normal")
-            messagebox.showerror("Wrong file selected", "Expected filenames:\n\nProject Boundary: *-aoi.geojson (or *-aoi(1).geojson, etc.)\nTask Grid: *-tasks.geojson (or *-tasks(1).geojson, etc.)\nGeofabrik: *.osm.pbf (or *.osm(1).pbf, etc.)")
+            messagebox.showerror("Wrong file selected", "Expected filenames:\n\nProject Boundary: *-aoi.geojson (Windows (1) suffix allowed)\nTask Grid: *-tasks.geojson (Windows (1) suffix allowed)\nGeofabrik: *.osm.pbf (Windows (1) suffix allowed)")
             return
-        self.status.set("Docker is running the authoritative pre-flight checks…")
+        self.status.set("Native Windows QA is running…")
         self.progress.set(40)
-        threading.Thread(target=self._docker_worker, daemon=True).start()
+        threading.Thread(target=self._native_worker, daemon=True).start()
 
     def _basic_checks(self):
         lines = []
@@ -150,25 +165,22 @@ class App(tk.Tk):
         return all(Path(path.get()).is_file() for path in (self.aoi_path, self.tasks_path, self.pbf_path))
 
     def _filename_patterns_ok(self):
-        patterns = (
-            (self.aoi_path.get(), r"-aoi(?:\s*\(\d+\))?\.geojson$"),
-            (self.tasks_path.get(), r"-tasks(?:\s*\(\d+\))?\.geojson$"),
-            (self.pbf_path.get(), r"\.osm(?:\s*\(\d+\))?\.pbf$"),
-        )
+        patterns = ((self.aoi_path.get(), r"-aoi(?:\s*\(\d+\))?\.geojson$"), (self.tasks_path.get(), r"-tasks(?:\s*\(\d+\))?\.geojson$"), (self.pbf_path.get(), r"\.osm(?:\s*\(\d+\))?\.pbf$"))
         return all(re.search(pattern, os.path.basename(path), flags=re.IGNORECASE) for path, pattern in patterns)
 
-    def _docker_worker(self):
+    def _native_worker(self):
         try:
             repo_dir = os.path.dirname(os.path.abspath(__file__))
             output_dir = os.path.join(repo_dir, "osm_qa_buddy_results", f"project_{self.project_id.get().strip()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
             os.makedirs(output_dir, exist_ok=True)
-            mounts = []
-            for source, target in ((self.aoi_path.get(), "/data/input/project_aoi.geojson"), (self.tasks_path.get(), "/data/input/project_tasks.geojson"), (self.pbf_path.get(), "/data/input/region.osm.pbf")):
-                mounts += ["--mount", f"type=bind,source={os.path.abspath(source)},target={target},readonly"]
-            mounts += ["--mount", f"type=bind,source={os.path.abspath(output_dir)},target=/data/output"]
-            command = ["docker", "run", "--rm", *mounts, "-e", f"QABOT_PROJECT_ID={self.project_id.get().strip()}", "qabot", "/data/input/region.osm.pbf", "/data/input/project_aoi.geojson", "/data/input/project_tasks.geojson", "/data/output"]
-            self.after(0, lambda: self._append_log("\nDOCKER / QA LIVE LOG\n" + "=" * 80 + "\n"))
-            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir)
+            work_dir = os.path.join(output_dir, "work")
+            os.makedirs(work_dir, exist_ok=True)
+            env = os.environ.copy()
+            env["QABOT_PROJECT_ID"] = self.project_id.get().strip()
+            env["QABOT_WORK_DIR"] = work_dir
+            command = [sys.executable, os.path.join(repo_dir, "orchestrator.py"), self.pbf_path.get(), self.aoi_path.get(), self.tasks_path.get(), output_dir, "--ram-gb", self.ram_gb.get().strip()]
+            self.after(0, lambda: self._append_log("\nNATIVE WINDOWS QA LIVE LOG\n" + "=" * 80 + "\n"))
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir, env=env)
             log_lines = []
             assert process.stdout is not None
             for raw_line in iter(process.stdout.readline, ""):
@@ -180,23 +192,22 @@ class App(tk.Tk):
             log_path = os.path.join(output_dir, "qa_run.log")
             Path(log_path).write_text("\n".join(log_lines) + "\n", encoding="utf-8")
             if returncode != 0:
-                raise RuntimeError(f"Docker QA failed (exit code {returncode}). Full log saved to:\n{log_path}")
-            self.after(0, lambda: self._docker_done(output_dir, log_path))
+                raise RuntimeError(f"Native QA failed (exit code {returncode}). Full log saved to:\n{log_path}")
+            self.after(0, lambda: self._native_done(output_dir, log_path))
         except Exception as exc:
             message = str(exc)
-            self.after(0, lambda: self._docker_failed(message))
+            self.after(0, lambda: self._native_failed(message))
 
-    def _docker_done(self, output_dir, log_path):
+    def _native_done(self, output_dir, log_path):
         self.progress.set(100)
         self.status.set("QA completed successfully.")
         self._append_log("\n" + "=" * 80 + "\nQA COMPLETED SUCCESSFULLY\n\nResults:\n" + output_dir + "\n\nFull log:\n" + log_path + "\n")
         messagebox.showinfo("QA complete", "3rd Pass Validation completed.\n\nResults are in:\n" + output_dir)
         report = Path(output_dir, "report.html")
-        if report.exists():
-            webbrowser.open(report.as_uri())
+        if report.exists(): webbrowser.open(report.as_uri())
         self.run_button.configure(state="normal")
 
-    def _docker_failed(self, message):
+    def _native_failed(self, message):
         self.progress.set(0)
         self.status.set("QA failed before completion.")
         self._append_log("\n" + "=" * 80 + "\nQA FAILED\n" + message + "\n")

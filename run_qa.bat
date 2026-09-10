@@ -3,31 +3,22 @@ setlocal
 
 cd /d "%~dp0"
 echo ========================================
-echo OSM QA Buddy - 3rd Pass Validation
+echo OSM QA Buddy - Native Windows
 echo ========================================
 echo.
-
-where docker >nul 2>&1
-if errorlevel 1 (
-    echo Docker Desktop / Docker CLI was not found.
-    echo Please install Docker Desktop and try again.
-    pause
-    exit /b 1
-)
 
 where python >nul 2>&1
 if errorlevel 1 (
     echo Python was not found.
-    echo Please install Python 3 with Tkinter and try again.
+    echo Install Python 3.12+ with Tkinter and try again.
     pause
     exit /b 1
 )
 
-echo Building Docker QA image...
-docker build -t qabot .
+python setup_native.py
 if errorlevel 1 (
     echo.
-    echo Docker image build failed.
+    echo Native prerequisite setup failed.
     pause
     exit /b 1
 )

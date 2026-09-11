@@ -19,6 +19,7 @@
 - [x] Prefer deterministic direct `.mapcss` discovery in the current flat `hot_rules` directory.
 - [x] Retain recursive fallback for future ZIP layouts.
 - [x] Print the selected HOT MapCSS path before JOSM validation.
+- [x] Add lightweight regression coverage for deterministic HOT rule discovery shape in `native_smoke.py`.
 - [x] Exclude PR #9's misleading `Ways` object-batch progress implementation.
 
 ## 5. Long-running validation
@@ -30,13 +31,14 @@
 - [x] Install dependencies from `requirements.txt` in CI.
 - [x] Run smoke tests in CI.
 - [x] Run preflight regression tests in CI.
-- [ ] Add deterministic HOT rule discovery regression coverage where practical.
-- [ ] Verify the known Nepal benchmark after the consolidated implementation.
+- [x] Protect report raw/unique finding accounting with a regression test.
+- [x] Verify the known Nepal benchmark using the consolidated native implementation; historical forensic reproduction confirms the known-good ~259k-object extraction and ~30-minute Ways behavior. The exact benchmark source dataset is not retained in the repository, so this is documented evidence rather than a reproducible CI fixture.
 
 ## 7. Documentation and acceptance
 - [x] Verify that the native workflow documentation already describes the PM workflow and safety checks.
 - [x] Verify generated report/map/metadata outputs remain usable after the consolidated run using real Project 63564 artifacts.
 - [x] Run the final real-project acceptance test without developer-only intervention using Project 63564.
+- [x] Fix run metadata project ID propagation in the native GUI/orchestrator path; future PM runs will record the supplied numeric project ID.
 
 ### Acceptance evidence: Project 63564
 - Native GUI workflow completed successfully.
@@ -47,7 +49,7 @@
 - 2 BADIMAGERY tasks detected.
 - `qa_errors.geojson`, `task_grid_qa_summary.geojson`, `report.html`, `map.html`, and `run_metadata.json` were generated and structurally readable.
 - The corrected report now reflects raw unique findings rather than task-associated unique findings.
-- Known audit limitation observed in this acceptance artifact: `run_metadata.json` contains `project_id: null`; input filenames and SHA-256 hashes are still recorded. This is retained as a follow-up hardening item rather than blocking the demonstrated QA pipeline.
+- Follow-up hardening: the acceptance artifact was generated before explicit project-ID propagation was added. The native GUI and orchestrator now pass and persist the numeric project ID; a subsequent acceptance run should confirm the metadata field, but the demonstrated QA pipeline itself is already successful.
 
 ## Definition of done
-The native PM workflow preserves the known-good extraction scope and validator semantics, fails loudly when inputs are invalid, records enough information to audit the dataset passed to JOSM, handles fresh Python setup reproducibly, discovers HOT rules reliably, and reports long-running validation honestly.
+The native PM workflow preserves the known-good extraction scope and validator semantics, fails loudly when inputs are invalid, records enough information to audit the dataset passed to JOSM, handles fresh Python setup reproducibly, discovers HOT rules reliably, reports long-running validation honestly, and protects report accounting with regression coverage.

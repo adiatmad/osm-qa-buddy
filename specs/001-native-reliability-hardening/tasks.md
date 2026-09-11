@@ -35,8 +35,19 @@
 
 ## 7. Documentation and acceptance
 - [x] Verify that the native workflow documentation already describes the PM workflow and safety checks.
-- [ ] Verify generated report/map/metadata outputs remain usable after the consolidated run.
-- [ ] Run the final real-project acceptance test without developer-only intervention.
+- [x] Verify generated report/map/metadata outputs remain usable after the consolidated run using real Project 63564 artifacts.
+- [x] Run the final real-project acceptance test without developer-only intervention using Project 63564.
+
+### Acceptance evidence: Project 63564
+- Native GUI workflow completed successfully.
+- 60 task features processed.
+- 81 raw JOSM findings produced.
+- Independent raw finding accounting: 73 unique findings and 8 exact duplicates.
+- Task association: 77 findings assigned to tasks and 4 unassigned.
+- 2 BADIMAGERY tasks detected.
+- `qa_errors.geojson`, `task_grid_qa_summary.geojson`, `report.html`, `map.html`, and `run_metadata.json` were generated and structurally readable.
+- The corrected report now reflects raw unique findings rather than task-associated unique findings.
+- Known audit limitation observed in this acceptance artifact: `run_metadata.json` contains `project_id: null`; input filenames and SHA-256 hashes are still recorded. This is retained as a follow-up hardening item rather than blocking the demonstrated QA pipeline.
 
 ## Definition of done
 The native PM workflow preserves the known-good extraction scope and validator semantics, fails loudly when inputs are invalid, records enough information to audit the dataset passed to JOSM, handles fresh Python setup reproducibly, discovers HOT rules reliably, and reports long-running validation honestly.

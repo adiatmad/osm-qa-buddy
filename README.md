@@ -38,9 +38,7 @@ QA Buddy is a **third-pass QA instrument**. It does not replace mapping or human
 
 The current working target is a **native Windows workflow**, not Docker.
 
-Docker files remain in the repository as a future packaging/Tech Team option, but they are **not required for the PM workflow described here**.
-
-The intended user experience is:
+Docker files remain in the repository as a future packaging/Tech Team option, but they are **not required for the PM workflow**.
 
 ```text
 run_qa.bat
@@ -53,7 +51,7 @@ Open official download links
     ↓
 Select AOI + Task Grid + Geofabrik PBF
     ↓
-Enter Java/JOSM RAM, e.g. 24
+Choose Java/JOSM RAM
     ↓
 START 3RD PASS VALIDATION
     ↓
@@ -61,8 +59,10 @@ native Osmium
     ↓
 JOSM 19613 + Jython 2.7.3
     ↓
-Task-level QA GeoJSON + report/map/log
+GeoJSON summary + HTML report
 ```
+
+The PM-facing goal is deliberately simple: **give the PM the GeoJSON summary and the HTML report, then let the PM decide where validators should look.**
 
 ---
 
@@ -79,35 +79,13 @@ On Windows, install:
 
 You do **not** need Docker for the current workflow.
 
-Check the important commands in PowerShell:
+Check the important commands:
 
 ```powershell
 python --version
 java -version
 osmium --version
 ```
-
-> **Important:** QA Buddy needs Python **3.12+** for the setup/GUI. Osmium can come from a separate environment. The launcher intentionally prefers `py -3.12` over the currently active `python`, so an older Conda environment containing Osmium does not have to provide the Python version used by QA Buddy.
-
-### Recommended Windows setup for Osmium
-
-One practical way to get native Osmium on Windows is Conda/Miniconda with conda-forge:
-
-```powershell
-conda create -n osmium-tools -c conda-forge osmium-tool -y
-conda activate osmium-tools
-osmium --version
-```
-
-If this environment contains an older Python version, **do not try to upgrade that environment just to run QA Buddy**. Keep the environment for Osmium and let `run_qa.bat` find your installed Python 3.12+ through the Windows Python launcher.
-
-The launcher checks for a working Python 3.12+ interpreter in this order:
-
-1. `py -3.12`
-2. the active `python`, but only if it reports Python 3.12+
-3. otherwise it stops with a clear error
-
-This separation was tested on a Windows machine where `osmium-tool 1.19.1` was installed in a Conda environment using Python 3.11, while Python 3.12 was installed separately. QA Buddy successfully launched its GUI with `py -3.12` while retaining the Conda environment's PATH for Osmium.
 
 ### 2. Clone the repository
 
@@ -122,14 +100,14 @@ cd osm-qa-buddy
 .\run_qa.bat
 ```
 
-The launcher selects a suitable Python 3.12+ interpreter, then `setup_native.py` checks Java and Osmium and downloads the pinned JOSM and Jython files if they are not already present.
+The launcher selects a suitable Python 3.12+ interpreter. `setup_native.py` checks Java and Osmium and downloads the pinned JOSM and Jython files if needed.
 
-The pinned versions are:
+Pinned QA components:
 
 - **JOSM tested revision: 19613**
 - **Jython: 2.7.3**
 
-You can also run the setup and GUI directly with a known Python 3.12+ interpreter:
+You can also run setup and the GUI directly:
 
 ```powershell
 py -3.12 setup_native.py
@@ -144,9 +122,9 @@ For example:
 63564
 ```
 
-The numeric ID is only used to construct the official Tasking Manager download links.
+The numeric ID is used to construct the official Tasking Manager download links.
 
-### 5. Download the three source files
+### 5. Download and select the three source files
 
 QA Buddy intentionally **does not automatically download the project source data**. You choose the exact files that will be audited.
 
@@ -168,21 +146,13 @@ Windows duplicate names such as `(1)` are accepted.
 
 ### 6. Choose Java/JOSM RAM
 
-The GUI has a simple numeric field:
+The GUI lets you choose the Java heap, for example:
 
 ```text
 Java/JOSM RAM (GB): 24
 ```
 
-Enter a whole number between **1 and 128**. QA Buddy passes that value directly to Java as `-Xmx`.
-
-For example:
-
-```text
-24  →  java -Xmx24g ...
-```
-
-This is intentionally simple: **you choose the RAM; QA Buddy does not try to guess it.** Do not allocate more RAM than the computer can spare.
+QA Buddy passes that value directly to Java as `-Xmx`. Do not allocate more RAM than the computer can spare.
 
 ### 7. Start validation
 
@@ -199,23 +169,24 @@ The pipeline performs:
 3. HOT TM MapCSS rule preparation using Python 3
 4. JOSM/Jython validation
 5. task-level finding aggregation
-6. report/map generation
+6. GeoJSON and HTML output generation
 
 ### 8. Use the result
 
-The main PM output is:
+The two important PM-facing outputs are:
 
-**`task_grid_qa_summary.geojson`**
+- **`task_grid_qa_summary.geojson`** — the primary GIS/task-prioritization output
+- **`report.html`** — the primary human-readable summary
 
-Open it in your normal GIS/map workflow and use the QA fields to identify **priority tasks or areas for human review**.
+Open the GeoJSON in your normal GIS/map workflow. Use the HTML report when you want the overall QA picture and supporting details.
 
 ---
 
-## Main output
+## Primary outputs
 
 ### `task_grid_qa_summary.geojson`
 
-This is the primary PM-facing output.
+This is the main PM-facing output.
 
 It keeps the Tasking Manager task grid and adds QA information to each task, including fields such as:
 
@@ -234,17 +205,25 @@ The goal is simple:
 
 > **Find the tasks that deserve attention first.**
 
-### Other outputs
+### `report.html`
+
+The human-readable QA summary. It provides the overall finding counts, duplicate-finding information, task-level results, BADIMAGERY information, and supporting run details.
+
+---
+
+## Other outputs
+
+These are useful supporting artifacts, but they are **not required for the normal PM workflow**:
 
 | File | Purpose |
 |---|---|
-| `report.html` | Human-readable QA summary and audit information |
 | `map.html` | Interactive map of tasks and findings |
 | `qa_errors.geojson` | Raw JOSM findings |
-| `task_grid_qa_summary.geojson` | Task-level QA result for PM use |
 | `sample.osm` | OSM data clipped to the project area |
-| `qa_run.log` | Full native processing log |
-| `run_metadata.json` | Toolchain, input, RAM, and run metadata |
+| `qa_run.log` | Native processing log |
+| `run_metadata.json` | Technical/toolchain run metadata |
+
+If you are a PM, start with **`task_grid_qa_summary.geojson` and `report.html`**.
 
 ---
 
@@ -312,7 +291,7 @@ During a run, Python 3 downloads the HOT Tasking Manager MapCSS rules before Jyt
 https://josm.openstreetmap.de/josmfile?page=Rules/ValidatingBuildingsInHOTTMProjects&zip=1
 ```
 
-This is deliberate: the older Jython 2.7 HTTPS stack previously caused failures on some computers. External rule preparation therefore happens in normal Python 3.
+External rule preparation uses normal Python 3 because older Jython HTTPS support can fail on some computers.
 
 ---
 
@@ -329,11 +308,7 @@ QA Buddy pins the QA-side Java components for reproducibility:
 
 `setup_native.py` downloads the pinned JOSM and Jython JARs into the local `tools/` directory. They are not committed to Git because they are binary dependencies.
 
-The JOSM download is SHA-256 verified before use. The expected digest for JOSM 19613 is:
-
-```text
-7bba9b5d5eb57db390672ddce571a67de9d5cf0b0e8fe610c4dbde15fbe59077
-```
+The JOSM download is SHA-256 verified before use.
 
 ---
 
@@ -368,7 +343,7 @@ Docker is **not part of the current PM workflow**.
 
 The repository still contains Docker-related files because the longer-term goal is to let the Tech Team package and standardize the environment later.
 
-For now, the practical message is:
+For now:
 
 > **If you want to test QA Buddy today, use the native Windows workflow.**
 

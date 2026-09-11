@@ -52,12 +52,13 @@ def _check_native_toolchain():
     if missing: raise RuntimeError("Native prerequisites missing: " + ", ".join(missing) + ". Run setup_native.py first.")
 
 
-def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_utc, ram_gb):
+def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_utc, ram_gb, project_id=None):
     inputs = {}
     for label, path in (("project_boundary", aoi_path), ("task_grid", tasks_path), ("geofabrik_pbf", pbf_path)):
         stat = os.stat(path)
         inputs[label] = {"filename": os.path.basename(path), "size_bytes": stat.st_size, "sha256": _sha256(path)}
-    metadata = {"qa_buddy_version": QA_BUDDY_VERSION, "project_id": os.environ.get("QABOT_PROJECT_ID") or None, "run_started_utc": run_started_utc, "validation_engine": "JOSM headless validator", "java_xmx_gb": ram_gb, "toolchain": {"josm_tested_version": JOSM_VERSION, "jython_version": JYTHON_VERSION, "java_runtime": _command_version(["java", "-version"]), "osmium_version": _command_version(["osmium", "--version"])}, "inputs": inputs, "human_review_required": True}
+    resolved_project_id = str(project_id).strip() if project_id is not None else os.environ.get("QABOT_PROJECT_ID") or None
+    metadata = {"qa_buddy_version": QA_BUDDY_VERSION, "project_id": resolved_project_id, "run_started_utc": run_started_utc, "validation_engine": "JOSM headless validator", "java_xmx_gb": ram_gb, "toolchain": {"josm_tested_version": JOSM_VERSION, "jython_version": JYTHON_VERSION, "java_runtime": _command_version(["java", "-version"]), "osmium_version": _command_version(["osmium", "--version"])}, "inputs": inputs, "human_review_required": True}
     Path(output_path).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"  -> Run metadata saved to: {output_path}")
     return output_path
@@ -174,7 +175,7 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     return summary_path
 
 
-def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=24):
+def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=24, project_id=None):
     os.makedirs(WORK_DIR, exist_ok=True)
     if output_dir: os.makedirs(output_dir, exist_ok=True)
     _check_native_toolchain(); run_started_utc = datetime.now(timezone.utc).isoformat()
@@ -182,7 +183,7 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=2
     preflight = validate_inputs(aoi_path, tasks_path, pbf_path, check_pbf=True)
     for check in preflight["checks"]: print(("PASS: " if check["ok"] else "FAIL: ") + check["message"])
     if not preflight["ok"]: raise RuntimeError("Pre-flight validation failed. Fix the selected input files and try again.")
-    metadata_path = os.path.join(WORK_DIR, "run_metadata.json"); write_run_metadata(aoi_path, tasks_path, pbf_path, metadata_path, run_started_utc, ram_gb)
+    metadata_path = os.path.join(WORK_DIR, "run_metadata.json"); write_run_metadata(aoi_path, tasks_path, pbf_path, metadata_path, run_started_utc, ram_gb, project_id=project_id)
     for src, name in ((aoi_path, "project_aoi.geojson"), (tasks_path, "project_tasks.geojson"), (pbf_path, "region.osm.pbf")):
         dst = os.path.join(WORK_DIR, name)
         if os.path.abspath(src) != os.path.abspath(dst): shutil.copy2(src, dst)
@@ -201,10 +202,11 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=2
 
 def main():
     parser = argparse.ArgumentParser(description="OSM QA Buddy native Windows pipeline")
-    parser.add_argument("pbf"); parser.add_argument("aoi"); parser.add_argument("tasks"); parser.add_argument("output_dir"); parser.add_argument("--ram-gb", type=int, default=24)
+    parser.add_argument("pbf"); parser.add_argument("aoi"); parser.add_argument("tasks"); parser.add_argument("output_dir"); parser.add_argument("--ram-gb", type=int, default=24); parser.add_argument("--project-id", default=None)
     args = parser.parse_args()
     if not 1 <= args.ram_gb <= 128: parser.error("--ram-gb must be between 1 and 128")
-    run_local_pipeline(args.pbf, args.aoi, args.tasks, args.output_dir, args.ram_gb)
+    if args.project_id is not None and not str(args.project_id).isdigit(): parser.error("--project-id must be numeric")
+    run_local_pipeline(args.pbf, args.aoi, args.tasks, args.output_dir, args.ram_gb, project_id=args.project_id)
 
 
 if __name__ == "__main__":

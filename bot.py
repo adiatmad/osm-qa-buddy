@@ -36,6 +36,7 @@ from org.openstreetmap.josm.tools import I18n
 from org.openstreetmap.josm.io import OsmReader
 from org.openstreetmap.josm.gui.progress import NullProgressMonitor
 from org.openstreetmap.josm.data.validation.tests import TagChecker, MapCSSTagChecker
+from org.openstreetmap.josm.data.validation import ValidationTask
 
 print("Starting QA Bot (HOT TM + Complete Building & Road Rules)...")
 sys.stdout.flush()
@@ -138,38 +139,82 @@ try:
         print("  -> Headless fix applied: waysUsedInRelations populated (" + str(ways_in_relations.size()) + " ways).")
         sys.stdout.flush()
 
-    print("\nStarting validation process...")
-    sys.stdout.flush()
     from java.util import ArrayList
     java_primitives = ArrayList(primitives)
-    all_errors = []
 
-    total_tests = len(test_list)
-    for idx, test in enumerate(test_list, start=1):
-        rule_name = test.getClass().getSimpleName()
-        if not rule_name or rule_name == "":
-            rule_name = test.getClass().getName().split(".")[-1]
-        print("  [" + str(idx) + "/" + str(total_tests) + "] Running " + rule_name + "...")
+    def run_legacy_validation():
+        """Compatibility path for JOSM builds where ValidationTask cannot run headlessly."""
+        print("Native ValidationTask unavailable; using legacy headless validator path.")
         sys.stdout.flush()
-        t_start = time.time()
-        try:
-            test.startTest(NullProgressMonitor.INSTANCE)
-            if rule_name == "UntaggedWay":
+        all_errors = []
+        total_tests = len(test_list)
+        for idx, test in enumerate(test_list, start=1):
+            rule_name = test.getClass().getSimpleName()
+            if not rule_name or rule_name == "":
+                rule_name = test.getClass().getName().split(".")[-1]
+            print("  [" + str(idx) + "/" + str(total_tests) + "] Running " + rule_name + "...")
+            sys.stdout.flush()
+            t_start = time.time()
+            try:
+                test.startTest(NullProgressMonitor.INSTANCE)
+                if rule_name == "UntaggedWay":
+                    populate_ways_used_in_relations(test, dataset)
+                test.visit(java_primitives)
+                test.endTest()
+                errs = test.getErrors()
+                found_count = len(errs) if errs else 0
+                if errs:
+                    all_errors.extend(errs)
+                print("      Finished in " + str(round(time.time() - t_start, 2)) + "s -> " + str(found_count) + " issue(s) found.")
+                sys.stdout.flush()
+            except java.lang.Throwable as t:
+                print("  [!] Skipping unstable rule (" + rule_name + "): " + str(t.getMessage()))
+                sys.stdout.flush()
+            except Exception as e:
+                print("  [!] Skipping unstable rule (" + rule_name + "): " + str(e))
+                sys.stdout.flush()
+        return all_errors
+
+    print("\nStarting validation process (native JOSM ValidationTask)...")
+    sys.stdout.flush()
+    all_errors = None
+    native_error = None
+
+    # ValidationTask is the same execution path used by JOSM's headless ValidatorCLI.
+    # It owns test lifecycle, progress monitoring, error collection and cleanup.
+    # This keeps QA Buddy aligned with JOSM's supported validation execution model.
+    try:
+        for test in test_list:
+            if test.getClass().getSimpleName() == "UntaggedWay":
                 populate_ways_used_in_relations(test, dataset)
-            test.visit(java_primitives)
-            test.endTest()
-            errs = test.getErrors()
-            found_count = len(errs) if errs else 0
-            if errs:
-                all_errors.extend(errs)
-            print("      Finished in " + str(round(time.time() - t_start, 2)) + "s -> " + str(found_count) + " issue(s) found.")
+
+        def validation_finished(errors):
+            print("  Native ValidationTask finished: " + str(len(errors) if errors else 0) + " issue(s).")
             sys.stdout.flush()
-        except java.lang.Throwable as t:
-            print("  [!] Skipping unstable rule (" + rule_name + "): " + str(t.getMessage()))
-            sys.stdout.flush()
-        except Exception as e:
-            print("  [!] Skipping unstable rule (" + rule_name + "): " + str(e))
-            sys.stdout.flush()
+
+        validation_task = ValidationTask(
+            validation_finished,
+            NullProgressMonitor.INSTANCE,
+            test_list,
+            java_primitives,
+            None,
+            False
+        )
+        validation_task.run()
+        all_errors = list(validation_task.getErrors())
+        print("  Native validation completed successfully.")
+        sys.stdout.flush()
+    except java.lang.Throwable as t:
+        native_error = str(t.getMessage())
+        print("  [!] Native ValidationTask failed: " + native_error)
+        sys.stdout.flush()
+    except Exception as e:
+        native_error = str(e)
+        print("  [!] Native ValidationTask failed: " + native_error)
+        sys.stdout.flush()
+
+    if all_errors is None:
+        all_errors = run_legacy_validation()
 
     geojson_output = {"type": "FeatureCollection", "features": []}
     for err in all_errors:

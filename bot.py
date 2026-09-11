@@ -145,18 +145,42 @@ try:
     all_errors = []
 
     total_tests = len(test_list)
+    total_objects = primitives.size()
     for idx, test in enumerate(test_list, start=1):
         rule_name = test.getClass().getSimpleName()
         if not rule_name or rule_name == "":
             rule_name = test.getClass().getName().split(".")[-1]
+        full_rule_name = test.getClass().getName()
         print("  [" + str(idx) + "/" + str(total_tests) + "] Running " + rule_name + "...")
+        if full_rule_name.endswith("CrossingWays$Ways"):
+            print("      This is the slowest validator on large datasets.")
+            print("      Progress is reported by object batches; validation semantics are unchanged.")
         sys.stdout.flush()
         t_start = time.time()
         try:
             test.startTest(NullProgressMonitor.INSTANCE)
             if rule_name == "UntaggedWay":
                 populate_ways_used_in_relations(test, dataset)
-            test.visit(java_primitives)
+
+            if full_rule_name.endswith("CrossingWays$Ways") and total_objects > 0:
+                batch_size = 10000
+                processed = 0
+                batch_start = time.time()
+                while processed < total_objects:
+                    end = min(processed + batch_size, total_objects)
+                    print("      Processing objects " + str(processed + 1) + "-" + str(end) + "/" + str(total_objects) + " (" + str(round(end * 100.0 / total_objects, 1)) + "%)...")
+                    sys.stdout.flush()
+                    test.visit(java_primitives.subList(processed, end))
+                    processed = end
+                    elapsed = time.time() - batch_start
+                    rate = processed / elapsed if elapsed > 0 else 0
+                    remaining = total_objects - processed
+                    eta = remaining / rate if rate > 0 else 0
+                    print("      Batch complete: " + str(processed) + "/" + str(total_objects) + " (" + str(round(processed * 100.0 / total_objects, 1)) + "%), elapsed " + str(round(elapsed, 1)) + "s, ETA ~" + str(round(eta, 1)) + "s")
+                    sys.stdout.flush()
+            else:
+                test.visit(java_primitives)
+
             test.endTest()
             errs = test.getErrors()
             found_count = len(errs) if errs else 0

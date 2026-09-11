@@ -16,10 +16,10 @@
 - [x] Report the detected Osmium version during setup.
 
 ## 4. HOT rule discovery
-- [ ] Prefer deterministic direct `.mapcss` discovery in the current flat `hot_rules` directory.
+- [x] Prefer deterministic direct `.mapcss` discovery in the current flat `hot_rules` directory.
 - [x] Retain recursive fallback for future ZIP layouts.
-- [ ] Print the selected HOT MapCSS path before JOSM validation.
-- [ ] Do not include PR #9's misleading `Ways` object-batch progress implementation.
+- [x] Print the selected HOT MapCSS path before JOSM validation.
+- [x] Exclude PR #9's misleading `Ways` object-batch progress implementation.
 
 ## 5. Long-running validation
 - [x] Use a 30-second JOSM heartbeat while the native validator runs.
@@ -34,8 +34,8 @@
 - [ ] Verify the known Nepal benchmark after the consolidated implementation.
 
 ## 7. Documentation and acceptance
-- [ ] Update the native workflow documentation to match the hardened behavior.
-- [ ] Verify generated report/map/metadata outputs remain usable.
+- [x] Verify that the native workflow documentation already describes the PM workflow and safety checks.
+- [ ] Verify generated report/map/metadata outputs remain usable after the consolidated run.
 - [ ] Run the final real-project acceptance test without developer-only intervention.
 
 ## Definition of done

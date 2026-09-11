@@ -44,18 +44,32 @@ try:
     I18n.init()
     work_dir = WORK_DIR
 
-    extract_path = work_dir + "/hot_rules"
+    extract_path = os.path.join(work_dir, "hot_rules")
     mapcss_file = None
-    for root, dirs, files in os.walk(extract_path):
-        for file in files:
-            if file.endswith(".mapcss"):
-                mapcss_file = os.path.join(root, file)
-                break
-        if mapcss_file:
-            break
+    if os.path.isdir(extract_path):
+        # The HOT rules ZIP is currently extracted flat into hot_rules.
+        # Prefer direct directory listing for deterministic Windows/Jython behavior.
+        for filename in os.listdir(extract_path):
+            if filename.endswith(".mapcss"):
+                candidate = os.path.join(extract_path, filename)
+                if os.path.isfile(candidate):
+                    mapcss_file = candidate
+                    break
+        # Keep a recursive fallback in case the ZIP layout changes later.
+        if not mapcss_file:
+            for root, dirs, files in os.walk(extract_path):
+                for filename in files:
+                    if filename.endswith(".mapcss"):
+                        mapcss_file = os.path.join(root, filename)
+                        break
+                if mapcss_file:
+                    break
 
     if not mapcss_file:
-        raise RuntimeError("HOT TM MapCSS rules were not prepared before JOSM validation started.")
+        raise RuntimeError("HOT TM MapCSS rules were not prepared before JOSM validation started: " + extract_path)
+
+    print("  -> HOT TM MapCSS rule file found: " + mapcss_file)
+    sys.stdout.flush()
 
     custom_mapcss_path = work_dir + "/size_rule.mapcss"
     with open(custom_mapcss_path, "w") as f:

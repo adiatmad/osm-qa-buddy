@@ -46,7 +46,8 @@ class ReportIntegrityTest(unittest.TestCase):
 
             self.assertIn("Raw QA findings</div><div class=\"value\">3", html)
             self.assertIn("Unique findings</div><div class=\"value\">2", html)
-            self.assertIn("1 are exact duplicates", html)
+            self.assertIn("are exact duplicates", html)
+            self.assertIn("<b>1</b> are exact duplicates", html)
 
 
 if __name__ == "__main__":

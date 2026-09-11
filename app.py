@@ -171,14 +171,15 @@ class App(tk.Tk):
     def _native_worker(self):
         try:
             repo_dir = os.path.dirname(os.path.abspath(__file__))
-            output_dir = os.path.join(repo_dir, "osm_qa_buddy_results", f"project_{self.project_id.get().strip()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            project_id = self.project_id.get().strip()
+            output_dir = os.path.join(repo_dir, "osm_qa_buddy_results", f"project_{project_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
             os.makedirs(output_dir, exist_ok=True)
             work_dir = os.path.join(output_dir, "work")
             os.makedirs(work_dir, exist_ok=True)
             env = os.environ.copy()
-            env["QABOT_PROJECT_ID"] = self.project_id.get().strip()
+            env["QABOT_PROJECT_ID"] = project_id
             env["QABOT_WORK_DIR"] = work_dir
-            command = [sys.executable, os.path.join(repo_dir, "orchestrator.py"), self.pbf_path.get(), self.aoi_path.get(), self.tasks_path.get(), output_dir, "--ram-gb", self.ram_gb.get().strip()]
+            command = [sys.executable, os.path.join(repo_dir, "orchestrator.py"), self.pbf_path.get(), self.aoi_path.get(), self.tasks_path.get(), output_dir, "--ram-gb", self.ram_gb.get().strip(), "--project-id", project_id]
             self.after(0, lambda: self._append_log("\nNATIVE WINDOWS QA LIVE LOG\n" + "=" * 80 + "\n"))
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir, env=env)
             log_lines = []

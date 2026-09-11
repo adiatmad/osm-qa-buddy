@@ -11,11 +11,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Python syntax
-        run: python3 -m py_compile app.py orchestrator.py setup_native.py preflight.py report.py run_wizard.py test_smoke.py native_smoke.py
-      - name: Install test dependency
-        run: python3 -m pip install shapely
+        run: python3 -m py_compile app.py orchestrator.py setup_native.py preflight.py report.py run_wizard.py test_smoke.py test_preflight.py test_report_integrity.py native_smoke.py
+      - name: Install test dependencies
+        run: python3 -m pip install -r requirements.txt
       - name: Run smoke tests
         run: python3 test_smoke.py
+      - name: Run preflight regression tests
+        run: python3 -m unittest test_preflight.py
+      - name: Run report integrity regression tests
+        run: python3 -m unittest test_report_integrity.py
       - name: Run native workflow checks
         run: python3 native_smoke.py
       - name: Build Docker image

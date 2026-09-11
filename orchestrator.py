@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
@@ -51,15 +52,25 @@ def _check_native_toolchain():
     if missing: raise RuntimeError("Native prerequisites missing: " + ", ".join(missing) + ". Run setup_native.py first.")
 
 
-def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_utc, ram_gb):
+def write_run_metadata(aoi_path, tasks_path, pbf_path, output_path, run_started_utc, ram_gb, project_id=None):
     inputs = {}
     for label, path in (("project_boundary", aoi_path), ("task_grid", tasks_path), ("geofabrik_pbf", pbf_path)):
         stat = os.stat(path)
         inputs[label] = {"filename": os.path.basename(path), "size_bytes": stat.st_size, "sha256": _sha256(path)}
-    metadata = {"qa_buddy_version": QA_BUDDY_VERSION, "project_id": os.environ.get("QABOT_PROJECT_ID") or None, "run_started_utc": run_started_utc, "validation_engine": "JOSM headless validator", "java_xmx_gb": ram_gb, "toolchain": {"josm_tested_version": JOSM_VERSION, "jython_version": JYTHON_VERSION, "java_runtime": _command_version(["java", "-version"]), "osmium_version": _command_version(["osmium", "--version"])}, "inputs": inputs, "human_review_required": True}
+    resolved_project_id = str(project_id).strip() if project_id is not None else os.environ.get("QABOT_PROJECT_ID") or None
+    metadata = {"qa_buddy_version": QA_BUDDY_VERSION, "project_id": resolved_project_id, "run_started_utc": run_started_utc, "validation_engine": "JOSM headless validator", "java_xmx_gb": ram_gb, "toolchain": {"josm_tested_version": JOSM_VERSION, "jython_version": JYTHON_VERSION, "java_runtime": _command_version(["java", "-version"]), "osmium_version": _command_version(["osmium", "--version"])}, "inputs": inputs, "human_review_required": True}
     Path(output_path).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"  -> Run metadata saved to: {output_path}")
     return output_path
+
+
+def _update_run_metadata(path, **updates):
+    try:
+        metadata = json.loads(Path(path).read_text(encoding="utf-8"))
+        metadata.update(updates)
+        Path(path).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+    except Exception as exc:
+        print(f"  -> Warning: could not update run metadata: {exc}")
 
 
 def prepare_hot_rules():
@@ -80,6 +91,13 @@ def prepare_hot_rules():
     return extract_path
 
 
+def _osmium_fileinfo(path):
+    result = subprocess.run(["osmium", "fileinfo", "-e", path], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"Osmium could not inspect the extracted dataset:\n{result.stderr or result.stdout}")
+    return result.stdout or result.stderr
+
+
 def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
     output_osm_path = os.path.join(WORK_DIR, "sample.osm")
     normalized_aoi_path = os.path.join(WORK_DIR, "osmium_aoi.geojson")
@@ -87,15 +105,27 @@ def clip_pbf_with_osmium(aoi_geojson_path, regional_pbf_path):
     print(f"[*] Clipping PBF ({os.path.basename(regional_pbf_path)}) using native Osmium...")
     result = subprocess.run(["osmium", "extract", "-p", normalized_aoi_path, regional_pbf_path, "-o", output_osm_path, "--overwrite"], capture_output=True, text=True)
     if result.returncode != 0: raise RuntimeError(f"Osmium extraction failed:\n{result.stderr or result.stdout}")
-    print(f"  -> Extracted project dataset saved to {output_osm_path}")
+    print("  -> Extracted project dataset:")
+    print(_osmium_fileinfo(output_osm_path))
+    print(f"  -> Saved to {output_osm_path}")
     return output_osm_path
 
 
 def run_josm_qa_bot(ram_gb):
     classpath = os.pathsep.join((str(JOSM_JAR), str(JYTHON_JAR)))
     print(f"[*] Executing native JOSM {JOSM_VERSION} + Jython {JYTHON_VERSION} with -Xmx{ram_gb}g...")
-    result = subprocess.run(["java", f"-Xmx{ram_gb}g", "-cp", classpath, "org.python.util.jython", str(REPO_DIR / "bot.py")], cwd=WORK_DIR)
-    if result.returncode != 0: raise RuntimeError("bot.py execution failed. Check the live log for the failing validator.")
+    print("    JOSM CrossingWays is a full-dataset spatial test; long periods without new log lines are expected.")
+    started = time.monotonic()
+    process = subprocess.Popen(["java", f"-Xmx{ram_gb}g", "-cp", classpath, "org.python.util.jython", str(REPO_DIR / "bot.py")], cwd=WORK_DIR)
+    last_heartbeat = started
+    while process.poll() is None:
+        time.sleep(30)
+        elapsed = int(time.monotonic() - started)
+        if elapsed - int(last_heartbeat - started) >= 30:
+            minutes, seconds = divmod(elapsed, 60)
+            print(f"    JOSM still running — elapsed {minutes}m {seconds:02d}s. Waiting for validator completion...")
+            last_heartbeat = time.monotonic()
+    if process.returncode != 0: raise RuntimeError("bot.py execution failed. Check the live log for the failing validator.")
 
 
 def _normalize_severity(value):
@@ -145,7 +175,7 @@ def aggregate_errors_to_tasks(tasks_geojson_path, errors_geojson_path):
     return summary_path
 
 
-def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=24):
+def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=24, project_id=None):
     os.makedirs(WORK_DIR, exist_ok=True)
     if output_dir: os.makedirs(output_dir, exist_ok=True)
     _check_native_toolchain(); run_started_utc = datetime.now(timezone.utc).isoformat()
@@ -153,12 +183,13 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=2
     preflight = validate_inputs(aoi_path, tasks_path, pbf_path, check_pbf=True)
     for check in preflight["checks"]: print(("PASS: " if check["ok"] else "FAIL: ") + check["message"])
     if not preflight["ok"]: raise RuntimeError("Pre-flight validation failed. Fix the selected input files and try again.")
-    metadata_path = os.path.join(WORK_DIR, "run_metadata.json"); write_run_metadata(aoi_path, tasks_path, pbf_path, metadata_path, run_started_utc, ram_gb)
+    metadata_path = os.path.join(WORK_DIR, "run_metadata.json"); write_run_metadata(aoi_path, tasks_path, pbf_path, metadata_path, run_started_utc, ram_gb, project_id=project_id)
     for src, name in ((aoi_path, "project_aoi.geojson"), (tasks_path, "project_tasks.geojson"), (pbf_path, "region.osm.pbf")):
         dst = os.path.join(WORK_DIR, name)
         if os.path.abspath(src) != os.path.abspath(dst): shutil.copy2(src, dst)
     aoi, tasks, pbf = (os.path.join(WORK_DIR, x) for x in ("project_aoi.geojson", "project_tasks.geojson", "region.osm.pbf"))
-    clip_pbf_with_osmium(aoi, pbf); prepare_hot_rules(); run_josm_qa_bot(ram_gb)
+    sample_path = clip_pbf_with_osmium(aoi, pbf); _update_run_metadata(metadata_path, extracted_dataset={"path": sample_path, "size_bytes": os.path.getsize(sample_path), "osmium_fileinfo": _osmium_fileinfo(sample_path)})
+    prepare_hot_rules(); run_josm_qa_bot(ram_gb)
     errors = os.path.join(WORK_DIR, "qa_errors.geojson"); summary = aggregate_errors_to_tasks(tasks, errors)
     report_path, map_path = os.path.join(WORK_DIR, "report.html"), os.path.join(WORK_DIR, "map.html")
     generate_report(errors, summary, report_path, map_path, metadata_path)
@@ -171,10 +202,11 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=2
 
 def main():
     parser = argparse.ArgumentParser(description="OSM QA Buddy native Windows pipeline")
-    parser.add_argument("pbf"); parser.add_argument("aoi"); parser.add_argument("tasks"); parser.add_argument("output_dir"); parser.add_argument("--ram-gb", type=int, default=24)
+    parser.add_argument("pbf"); parser.add_argument("aoi"); parser.add_argument("tasks"); parser.add_argument("output_dir"); parser.add_argument("--ram-gb", type=int, default=24); parser.add_argument("--project-id", default=None)
     args = parser.parse_args()
     if not 1 <= args.ram_gb <= 128: parser.error("--ram-gb must be between 1 and 128")
-    run_local_pipeline(args.pbf, args.aoi, args.tasks, args.output_dir, args.ram_gb)
+    if args.project_id is not None and not str(args.project_id).isdigit(): parser.error("--project-id must be numeric")
+    run_local_pipeline(args.pbf, args.aoi, args.tasks, args.output_dir, args.ram_gb, project_id=args.project_id)
 
 
 if __name__ == "__main__":

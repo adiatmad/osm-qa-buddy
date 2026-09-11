@@ -109,6 +109,16 @@ def _normalize_severity(value):
     return value
 
 
+def _finding_key(finding):
+    return (
+        str(finding.get("properties", {}).get("severity") or "UNKNOWN"),
+        str(finding.get("properties", {}).get("rule") or "Unknown"),
+        str(finding.get("properties", {}).get("message") or ""),
+        str(finding.get("properties", {}).get("object_id") or ""),
+        tuple(finding.get("geometry", {}).get("coordinates") or ()),
+    )
+
+
 def _task_id(props):
     return props.get("taskId") or props.get("task_id") or props.get("id") or props.get("uuid") or "Unknown"
 
@@ -135,9 +145,9 @@ def generate_report(errors_path, tasks_path, report_path, map_path, metadata_pat
     )
     rule_counts = Counter(f.get("properties", {}).get("rule", "Unknown") for f in error_features)
     issueful_tasks = sum(1 for f in task_features if (f.get("properties", {}).get("qa_finding_count") or f.get("properties", {}).get("qa_total_issues") or 0) > 0)
-    unique_objects = sum((f.get("properties", {}).get("qa_unique_osm_object_count") or 0) for f in task_features)
+    unique_objects = len({str(f.get("properties", {}).get("object_id") or "") for f in error_features if f.get("properties", {}).get("object_id")})
     raw_finding_count = len(error_features)
-    unique_finding_count = sum((f.get("properties", {}).get("qa_unique_finding_count") or f.get("properties", {}).get("qa_finding_count") or 0) for f in task_features)
+    unique_finding_count = len({_finding_key(f) for f in error_features})
     duplicate_finding_count = raw_finding_count - unique_finding_count
     badimagery_tasks = [
         f for f in task_features

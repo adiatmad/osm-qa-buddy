@@ -53,15 +53,33 @@ def _polygon_union(features, label):
     return merged
 
 
+def _first_polygon_feature(features, label):
+    """Return the first polygon feature, matching Osmium's GeoJSON semantics."""
+    feature = features[0]
+    geom = shape(feature["geometry"])
+    if geom.is_empty:
+        raise ValueError(f"{label} first feature is empty.")
+    if not geom.is_valid:
+        raise ValueError(f"{label} first feature contains invalid geometry.")
+    if geom.geom_type not in ("Polygon", "MultiPolygon"):
+        raise ValueError(f"{label} first feature must be Polygon/MultiPolygon; found {geom.geom_type}.")
+    return feature
+
+
 def normalize_aoi_for_osmium(aoi_path, output_path):
-    """Write the AOI as a single GeoJSON Feature, which Osmium extract -p accepts."""
+    """Write the AOI feature Osmium will actually use for extraction.
+
+    Osmium's GeoJSON polygon reader uses the first Feature in a FeatureCollection.
+    Preserve that behavior instead of unioning multiple AOI features, which can
+    silently enlarge the extraction and make JOSM validation dramatically slower.
+    """
     _, aoi_features = _load_features(aoi_path)
-    aoi_geom = _polygon_union(aoi_features, "Project Boundary")
+    first_feature = _first_polygon_feature(aoi_features, "Project Boundary")
 
     normalized = {
         "type": "Feature",
-        "properties": {},
-        "geometry": mapping(aoi_geom),
+        "properties": first_feature.get("properties", {}),
+        "geometry": first_feature["geometry"],
     }
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(normalized, f)
@@ -82,7 +100,11 @@ def validate_geojson_inputs(aoi_path, tasks_path):
     try:
         _, aoi_features = _load_features(aoi_path)
         aoi_geom = _polygon_union(aoi_features, "Project Boundary")
-        checks.append({"ok": True, "message": "Project Boundary is valid polygon GeoJSON."})
+        _first_polygon_feature(aoi_features, "Project Boundary")
+        message = "Project Boundary is valid polygon GeoJSON."
+        if len(aoi_features) > 1:
+            message += f" {len(aoi_features)} features found; Osmium extraction will use the first feature."
+        checks.append({"ok": True, "message": message})
     except Exception as exc:
         checks.append({"ok": False, "message": f"Project Boundary is invalid: {exc}"})
         return {"ok": False, "checks": checks}

@@ -187,44 +187,47 @@ class App(tk.Tk):
                 command.extend(["--project-id", project_id])
             self.after(0, lambda: self._append_log("\nNATIVE WINDOWS QA LIVE LOG\n" + "=" * 80 + "\n"))
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir, env=env)
-            handoff_started = False
+            threading.Thread(target=self._monitor_josm_dataset, args=(process, work_dir, output_dir), daemon=True).start()
             log_lines = []
             assert process.stdout is not None
-            while True:
-                if not handoff_started:
-                    source = Path(work_dir, "sample.osm")
-                    if source.is_file() and source.stat().st_size > 0:
-                        josm_dataset = self._create_josm_dataset(work_dir, output_dir)
-                        handoff_started = True
-                        self.after(0, lambda path=josm_dataset: self._josm_dataset_ready(output_dir, path))
-                raw_line = process.stdout.readline()
-                if raw_line:
-                    line = raw_line.rstrip("\r\n")
-                    log_lines.append(line)
-                    self.after(0, lambda text=line: self._append_log(text + "\n"))
-                    continue
-                if process.poll() is not None:
-                    break
-                time.sleep(0.5)
+            for raw_line in iter(process.stdout.readline, ""):
+                line = raw_line.rstrip("\r\n")
+                log_lines.append(line)
+                self.after(0, lambda text=line: self._append_log(text + "\n"))
             process.stdout.close()
             returncode = process.wait()
             log_path = os.path.join(output_dir, "qa_run.log")
             Path(log_path).write_text("\n".join(log_lines) + "\n", encoding="utf-8")
             if returncode != 0:
                 raise RuntimeError(f"Native QA failed (exit code {returncode}). Full log saved to:\n{log_path}")
-            if not handoff_started:
+            josm_dataset = self.last_josm_dataset
+            if not josm_dataset or not Path(josm_dataset).is_file():
                 josm_dataset = self._create_josm_dataset(work_dir, output_dir)
-            else:
-                josm_dataset = self.last_josm_dataset or self._create_josm_dataset(work_dir, output_dir)
             self.after(0, lambda: self._native_done(output_dir, log_path, josm_dataset))
         except Exception as exc:
             message = str(exc)
             self.after(0, lambda: self._native_failed(message))
 
+    def _monitor_josm_dataset(self, process, work_dir, output_dir):
+        source = Path(work_dir, "sample.osm")
+        while process.poll() is None:
+            if source.is_file() and source.stat().st_size > 0:
+                previous_size = source.stat().st_size
+                time.sleep(2)
+                if process.poll() is None and source.is_file() and source.stat().st_size == previous_size:
+                    try:
+                        josm_dataset = self._create_josm_dataset(work_dir, output_dir)
+                    except Exception:
+                        time.sleep(1)
+                        continue
+                    self.after(0, lambda path=josm_dataset: self._josm_dataset_ready(output_dir, path))
+                    return
+            time.sleep(1)
+
     def _create_josm_dataset(self, work_dir, output_dir):
         source = Path(work_dir, "sample.osm")
         if not source.is_file():
-            raise RuntimeError("QA completed, but the extracted OSM dataset was not found at:\n" + str(source))
+            raise RuntimeError("The extracted OSM dataset was not found at:\n" + str(source))
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         destination = Path(output_dir, f"osm_qa_buddy_josm_{timestamp}.osm")
         shutil.copy2(source, destination)

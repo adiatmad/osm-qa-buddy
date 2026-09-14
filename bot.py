@@ -154,7 +154,7 @@ try:
     def should_keep_error(err):
         try:
             tester_name = err.getTester().getName()
-            message = str(err.getMessage() or "").strip().casefold()
+            message = str(err.getMessage() or "").strip().lower()
             if tester_name == "UntaggedWay" and message == "unnamed ways":
                 return False
         except Exception:

@@ -2,6 +2,8 @@
 
 **An unofficial companion for HOT Tasking Manager projects, built to support third-pass QA.**
 
+<img width="1915" height="1008" alt="image" src="https://github.com/user-attachments/assets/9f5be7b9-3dde-4559-b452-3b68aab92447" />
+
 OSM QA Buddy helps a HOT Tasking Manager Project Manager answer one simple question:
 
 > **“After normal validation is finished, where should my validators look again?”**

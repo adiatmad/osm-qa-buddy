@@ -11,7 +11,10 @@ def test_native_runner_shape():
     assert "--ram-gb" in app
     assert "--project-id" in app
     assert "sample.osm.ready.json" in app
-    assert "Project Boundary" not in app
+    assert 'text="HOT Task Grid"' in app
+    assert 'text="Geofabrik PBF"' in app
+    assert 'text="Project Boundary"' not in app
+    assert "Project Boundary is intentionally not requested" in app
     assert "docker" not in app.lower()
     assert "normalize_task_grid_for_osmium" in preflight
     assert "union_of_task_grid" in orchestrator

@@ -50,75 +50,69 @@ def _polygon_union(features, label):
     merged = unary_union(geometries)
     if merged.is_empty:
         raise ValueError(f"{label} geometry is empty.")
+    if merged.geom_type not in ("Polygon", "MultiPolygon"):
+        raise ValueError(f"{label} union produced unsupported geometry: {merged.geom_type}.")
     return merged
 
 
-def _first_polygon_feature(features, label):
-    """Return the first polygon feature, matching Osmium's GeoJSON semantics."""
-    feature = features[0]
-    geom = shape(feature["geometry"])
-    if geom.is_empty:
-        raise ValueError(f"{label} first feature is empty.")
-    if not geom.is_valid:
-        raise ValueError(f"{label} first feature contains invalid geometry.")
-    if geom.geom_type not in ("Polygon", "MultiPolygon"):
-        raise ValueError(f"{label} first feature must be Polygon/MultiPolygon; found {geom.geom_type}.")
-    return feature
+def normalize_task_grid_for_osmium(tasks_path, output_path):
+    """Write the union of all Task Grid polygons as Osmium's extraction polygon.
 
-
-def normalize_aoi_for_osmium(aoi_path, output_path):
-    """Write the AOI feature Osmium will actually use for extraction.
-
-    Osmium's GeoJSON polygon reader uses the first Feature in a FeatureCollection.
-    Preserve that behavior instead of unioning multiple AOI features, which can
-    silently enlarge the extraction and make JOSM validation dramatically slower.
+    The individual task features are deliberately retained in the original
+    Task Grid file for later finding-to-task attribution. Only the extraction
+    polygon is dissolved here so Osmium sees the complete Task Grid instead of
+    just the first feature in a FeatureCollection.
     """
-    _, aoi_features = _load_features(aoi_path)
-    first_feature = _first_polygon_feature(aoi_features, "Project Boundary")
-
+    _, task_features = _load_features(tasks_path)
+    merged = _polygon_union(task_features, "Task Grid")
     normalized = {
         "type": "Feature",
-        "properties": first_feature.get("properties", {}),
-        "geometry": first_feature["geometry"],
+        "properties": {"source": "HOT Task Grid", "feature_count": len(task_features)},
+        "geometry": mapping(merged),
     }
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(normalized, f)
-
     return output_path
 
 
-def validate_geojson_inputs(aoi_path, tasks_path):
+def validate_task_grid_input(tasks_path):
     checks = []
-
-    for label, path in (("Project Boundary", aoi_path), ("Task Grid", tasks_path)):
-        ok = bool(path and os.path.isfile(path) and os.access(path, os.R_OK))
-        checks.append({"ok": ok, "message": f"{label} file is readable." if ok else f"{label} file is missing or unreadable."})
-
-    if not all(c["ok"] for c in checks):
-        return {"ok": False, "checks": checks}
-
-    try:
-        _, aoi_features = _load_features(aoi_path)
-        aoi_geom = _polygon_union(aoi_features, "Project Boundary")
-        _first_polygon_feature(aoi_features, "Project Boundary")
-        message = "Project Boundary is valid polygon GeoJSON."
-        if len(aoi_features) > 1:
-            message += f" {len(aoi_features)} features found; Osmium extraction will use the first feature."
-        checks.append({"ok": True, "message": message})
-    except Exception as exc:
-        checks.append({"ok": False, "message": f"Project Boundary is invalid: {exc}"})
+    ok = bool(tasks_path and os.path.isfile(tasks_path) and os.access(tasks_path, os.R_OK))
+    checks.append({"ok": ok, "message": "Task Grid file is readable." if ok else "Task Grid file is missing or unreadable."})
+    if not ok:
         return {"ok": False, "checks": checks}
 
     try:
         _, task_features = _load_features(tasks_path)
-        task_geom = _polygon_union(task_features, "Task Grid")
-        checks.append({"ok": True, "message": f"Task Grid is valid polygon GeoJSON ({len(task_features)} features)."})
+        merged = _polygon_union(task_features, "Task Grid")
+        checks.append({"ok": True, "message": f"Task Grid is valid polygon GeoJSON ({len(task_features)} features; extraction union is {merged.geom_type})."})
     except Exception as exc:
         checks.append({"ok": False, "message": f"Task Grid is invalid: {exc}"})
-        return {"ok": False, "checks": checks}
 
-    overlap = aoi_geom.intersects(task_geom)
-    checks.append({"ok": overlap, "message": "Task Grid intersects the Project Boundary." if overlap else "Task Grid does not intersect the Project Boundary."})
+    return {"ok": all(c["ok"] for c in checks), "checks": checks}
+
+
+def validate_geojson_inputs(aoi_path, tasks_path):
+    """Backward-compatible validation for callers still supplying both files.
+
+    Project Boundary is informational only; Task Grid is the authoritative
+    extraction geometry. The boundary is still checked when supplied so older
+    callers get a useful diagnostic rather than silently ignoring a bad file.
+    """
+    checks = []
+    if aoi_path:
+        ok = bool(os.path.isfile(aoi_path) and os.access(aoi_path, os.R_OK))
+        checks.append({"ok": ok, "message": "Project Boundary file is readable." if ok else "Project Boundary file is missing or unreadable."})
+        if ok:
+            try:
+                _, aoi_features = _load_features(aoi_path)
+                _polygon_union(aoi_features, "Project Boundary")
+                checks.append({"ok": True, "message": "Project Boundary is valid polygon GeoJSON (informational only; Task Grid controls extraction)."})
+            except Exception as exc:
+                checks.append({"ok": False, "message": f"Project Boundary is invalid: {exc}"})
+
+    task_result = validate_task_grid_input(tasks_path)
+    checks.extend(task_result["checks"])
     return {"ok": all(c["ok"] for c in checks), "checks": checks}
 
 
@@ -134,10 +128,10 @@ def validate_pbf(pbf_path):
     return {"ok": False, "message": f"Geofabrik PBF could not be read by Osmium: {detail}"}
 
 
-def validate_inputs(aoi_path, tasks_path, pbf_path=None, check_pbf=False):
-    result = validate_geojson_inputs(aoi_path, tasks_path)
-    if not result["ok"]:
-        return result
+def validate_inputs(tasks_path, pbf_path=None, check_pbf=False, aoi_path=None):
+    result = validate_task_grid_input(tasks_path)
+    if aoi_path:
+        result = validate_geojson_inputs(aoi_path, tasks_path)
 
     if check_pbf:
         pbf_result = validate_pbf(pbf_path)

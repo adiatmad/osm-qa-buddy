@@ -1,5 +1,4 @@
 import os
-import re
 import subprocess
 import sys
 import threading
@@ -26,7 +25,7 @@ class App(tk.Tk):
         self.tasks_path = tk.StringVar()
         self.pbf_path = tk.StringVar()
         self.ram_gb = tk.StringVar(value=DEFAULT_RAM_GB)
-        self.status = tk.StringVar(value="Enter a HOT TM Project ID to begin.")
+        self.status = tk.StringVar(value="Select the 3 input files to begin. Project ID is optional.")
         self.progress = tk.DoubleVar(value=0)
         self.aoi_url = self.tasks_url = None
 
@@ -38,20 +37,21 @@ class App(tk.Tk):
         ttk.Label(root, text="OSM QA Buddy", font=("Segoe UI", 18, "bold")).pack(anchor="w")
         ttk.Label(root, text="HOT Tasking Manager — 3rd Pass Validation", font=("Segoe UI", 9)).pack(anchor="w", pady=(0, 10))
 
-        project = ttk.LabelFrame(root, text="1. HOT TM Project", padding=8)
+        project = ttk.LabelFrame(root, text="1. HOT TM Project (optional)", padding=8)
         project.pack(fill="x")
         row = ttk.Frame(project); row.pack(fill="x")
         ttk.Label(row, text="Project ID:").pack(side="left")
         ttk.Entry(row, textvariable=self.project_id, width=16).pack(side="left", padx=6)
         ttk.Button(row, text="Prepare download links", command=self.prepare_project).pack(side="left")
+        ttk.Label(project, text="Optional: enter a numeric HOT TM Project ID only if you want the official download links. It is not required to run QA on local files.", wraplength=720).pack(anchor="w", pady=(5, 0))
 
         links = ttk.LabelFrame(root, text="2. Download source files", padding=8)
         links.pack(fill="x", pady=8)
-        ttk.Label(links, text="The app does NOT download these files. Open the links, download the exact files, then select them below.", wraplength=720).pack(anchor="w", pady=(0, 5))
+        ttk.Label(links, text="The app does NOT download these files. Open the links, download the source files, then select them below.", wraplength=720).pack(anchor="w", pady=(0, 5))
         buttons = ttk.Frame(links); buttons.pack(fill="x")
-        self.aoi_button = ttk.Button(buttons, text="HOT TM Boundary (-aoi.geojson)", command=lambda: self.open_link(self.aoi_url), state="disabled")
+        self.aoi_button = ttk.Button(buttons, text="HOT TM Boundary", command=lambda: self.open_link(self.aoi_url), state="disabled")
         self.aoi_button.pack(side="left", padx=(0, 5))
-        self.tasks_button = ttk.Button(buttons, text="HOT TM Tasks (-tasks.geojson)", command=lambda: self.open_link(self.tasks_url), state="disabled")
+        self.tasks_button = ttk.Button(buttons, text="HOT TM Tasks", command=lambda: self.open_link(self.tasks_url), state="disabled")
         self.tasks_button.pack(side="left", padx=5)
         ttk.Button(buttons, text="Geofabrik downloads", command=lambda: self.open_link(GEOFABRIK_URL)).pack(side="left", padx=5)
 
@@ -86,14 +86,14 @@ class App(tk.Tk):
         ttk.Label(parent, text=label, width=17).grid(row=row, column=0, sticky="w", pady=3)
         ttk.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", padx=6, pady=3)
         if kind == "aoi":
-            filetypes = [("HOT TM AOI", "*.geojson"), ("All files", "*.*")]
-            help_text = "Expected: filename ends with -aoi.geojson (Windows (1) suffix allowed)"
+            filetypes = [("GeoJSON", "*.geojson"), ("All files", "*.*")]
+            help_text = "Any valid GeoJSON filename; preflight validates the contents."
         elif kind == "tasks":
-            filetypes = [("HOT TM Tasks", "*.geojson"), ("All files", "*.*")]
-            help_text = "Expected: filename ends with -tasks.geojson (Windows (1) suffix allowed)"
+            filetypes = [("GeoJSON", "*.geojson"), ("All files", "*.*")]
+            help_text = "Any valid GeoJSON filename; preflight validates the contents."
         else:
             filetypes = [("OSM PBF", "*.osm.pbf"), ("PBF", "*.pbf"), ("All files", "*.*")]
-            help_text = "Expected: filename ends with .osm.pbf (Windows (1) suffix allowed)"
+            help_text = "Any readable OSM PBF filename; preflight validates the file."
         ttk.Button(parent, text="Browse", command=lambda: self.browse(variable, filetypes)).grid(row=row, column=2, padx=(0, 6), pady=3)
         ttk.Label(parent, text=help_text).grid(row=row, column=3, sticky="w", pady=3)
         parent.columnconfigure(1, weight=1)
@@ -107,15 +107,15 @@ class App(tk.Tk):
     def prepare_project(self):
         project_id = self.project_id.get().strip()
         if not project_id.isdigit():
-            messagebox.showerror("Invalid Project ID", "Please enter a numeric HOT TM Project ID.")
+            messagebox.showerror("Invalid Project ID", "Please enter a numeric HOT TM Project ID, or leave it blank if you already have the source files.")
             return
         self.aoi_url = f"{TM_API_BASE}{project_id}/queries/aoi/?as_file=true"
         self.tasks_url = f"{TM_API_BASE}{project_id}/tasks/?as_file=true"
         self.aoi_button.configure(state="normal")
         self.tasks_button.configure(state="normal")
-        self.status.set("Download the 2 HOT TM GeoJSON files and the matching Geofabrik PBF, then select all 3 files.")
+        self.status.set("Download the HOT TM GeoJSON files and the matching Geofabrik PBF, then select all 3 files.")
         self.progress.set(20)
-        self._set_check_text("OFFICIAL DOWNLOAD LINKS\n\n" + f"Project Boundary (-aoi.geojson):\n{self.aoi_url}\n\n" + f"Task Grid (-tasks.geojson):\n{self.tasks_url}\n\n" + f"Geofabrik downloads:\n{GEOFABRIK_URL}\n")
+        self._set_check_text("OFFICIAL DOWNLOAD LINKS\n\n" + f"Project Boundary:\n{self.aoi_url}\n\n" + f"Task Grid:\n{self.tasks_url}\n\n" + f"Geofabrik downloads:\n{GEOFABRIK_URL}\n")
         self._update_run_state()
 
     def open_link(self, url):
@@ -143,13 +143,6 @@ class App(tk.Tk):
         self.status.set("Starting native Windows 3rd-pass validation…")
         self.progress.set(30)
         self._set_check_text("STARTING 3RD PASS VALIDATION\n\nLOCAL INPUT CHECKS\n" + self._basic_checks() + f"\n\nJava/JOSM RAM: {self.ram_gb.get().strip()} GB\n")
-        if not self._filename_patterns_ok():
-            self.status.set("Filename check failed.")
-            self.progress.set(0)
-            self._append_log("\nFAIL: Filename pattern check failed.\n")
-            self.run_button.configure(state="normal")
-            messagebox.showerror("Wrong file selected", "Expected filenames:\n\nProject Boundary: *-aoi.geojson (Windows (1) suffix allowed)\nTask Grid: *-tasks.geojson (Windows (1) suffix allowed)\nGeofabrik: *.osm.pbf (Windows (1) suffix allowed)")
-            return
         self.status.set("Native Windows QA is running…")
         self.progress.set(40)
         threading.Thread(target=self._native_worker, daemon=True).start()
@@ -164,22 +157,24 @@ class App(tk.Tk):
     def _basic_inputs_ok(self):
         return all(Path(path.get()).is_file() for path in (self.aoi_path, self.tasks_path, self.pbf_path))
 
-    def _filename_patterns_ok(self):
-        patterns = ((self.aoi_path.get(), r"-aoi(?:\s*\(\d+\))?\.geojson$"), (self.tasks_path.get(), r"-tasks(?:\s*\(\d+\))?\.geojson$"), (self.pbf_path.get(), r"\.osm(?:\s*\(\d+\))?\.pbf$"))
-        return all(re.search(pattern, os.path.basename(path), flags=re.IGNORECASE) for path, pattern in patterns)
-
     def _native_worker(self):
         try:
             repo_dir = os.path.dirname(os.path.abspath(__file__))
             project_id = self.project_id.get().strip()
-            output_dir = os.path.join(repo_dir, "osm_qa_buddy_results", f"project_{project_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+            run_label = project_id if project_id else "local"
+            output_dir = os.path.join(repo_dir, "osm_qa_buddy_results", f"project_{run_label}_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
             os.makedirs(output_dir, exist_ok=True)
             work_dir = os.path.join(output_dir, "work")
             os.makedirs(work_dir, exist_ok=True)
             env = os.environ.copy()
-            env["QABOT_PROJECT_ID"] = project_id
+            if project_id:
+                env["QABOT_PROJECT_ID"] = project_id
+            else:
+                env.pop("QABOT_PROJECT_ID", None)
             env["QABOT_WORK_DIR"] = work_dir
-            command = [sys.executable, os.path.join(repo_dir, "orchestrator.py"), self.pbf_path.get(), self.aoi_path.get(), self.tasks_path.get(), output_dir, "--ram-gb", self.ram_gb.get().strip(), "--project-id", project_id]
+            command = [sys.executable, os.path.join(repo_dir, "orchestrator.py"), self.pbf_path.get(), self.aoi_path.get(), self.tasks_path.get(), output_dir, "--ram-gb", self.ram_gb.get().strip()]
+            if project_id:
+                command.extend(["--project-id", project_id])
             self.after(0, lambda: self._append_log("\nNATIVE WINDOWS QA LIVE LOG\n" + "=" * 80 + "\n"))
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir, env=env)
             log_lines = []

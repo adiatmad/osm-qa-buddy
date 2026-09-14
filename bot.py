@@ -44,31 +44,29 @@ try:
     I18n.init()
     work_dir = WORK_DIR
 
-    extract_path = os.path.join(work_dir, "hot_rules")
-    mapcss_file = None
-    if os.path.isdir(extract_path):
-        # The HOT rules ZIP is currently extracted flat into hot_rules.
-        # Prefer direct directory listing for deterministic Windows/Jython behavior.
-        for filename in os.listdir(extract_path):
-            if filename.endswith(".mapcss"):
-                candidate = os.path.join(extract_path, filename)
-                if os.path.isfile(candidate):
-                    mapcss_file = candidate
-                    break
-        # Keep a recursive fallback in case the ZIP layout changes later.
-        if not mapcss_file:
-            for root, dirs, files in os.walk(extract_path):
-                for filename in files:
-                    if filename.endswith(".mapcss"):
-                        mapcss_file = os.path.join(root, filename)
-                        break
-                if mapcss_file:
-                    break
+    def find_mapcss_files(directory):
+        found = []
+        if not os.path.isdir(directory):
+            return found
+        for root, dirs, files in os.walk(directory):
+            for filename in files:
+                if filename.endswith(".mapcss"):
+                    found.append(os.path.join(root, filename))
+        found.sort()
+        return found
 
-    if not mapcss_file:
-        raise RuntimeError("HOT TM MapCSS rules were not prepared before JOSM validation started: " + extract_path)
+    hot_rules_dir = os.path.join(work_dir, "hot_rules")
+    external_rules_dir = os.path.join(work_dir, "external_rules")
+    hot_mapcss_files = find_mapcss_files(hot_rules_dir)
+    external_mapcss_files = find_mapcss_files(external_rules_dir)
+    if not hot_mapcss_files:
+        raise RuntimeError("HOT TM MapCSS rules were not prepared before JOSM validation started: " + hot_rules_dir)
 
-    print("  -> HOT TM MapCSS rule file found: " + mapcss_file)
+    print("  -> HOT TM MapCSS rule file(s) found: " + ", ".join(hot_mapcss_files))
+    if external_mapcss_files:
+        print("  -> Additional third-pass MapCSS rule file(s): " + ", ".join(external_mapcss_files))
+    else:
+        print("  -> No additional third-pass MapCSS rule files were prepared.")
     sys.stdout.flush()
 
     custom_mapcss_path = work_dir + "/size_rule.mapcss"
@@ -99,8 +97,9 @@ try:
     except Exception as e:
         print("  -> Failed to load built-in geometry.mapcss: " + str(e))
 
-    mapcss_checker.addMapCSS("file:///" + mapcss_file.replace("\\", "/"))
-    print("  -> HOT TM MapCSS rules loaded.")
+    for rule_file in hot_mapcss_files + external_mapcss_files:
+        mapcss_checker.addMapCSS("file:///" + rule_file.replace("\\", "/"))
+        print("  -> MapCSS rules loaded: " + rule_file)
     mapcss_checker.addMapCSS("file:///" + custom_mapcss_path.replace("\\", "/"))
     print("  -> Custom oversize MapCSS rule loaded.")
     sys.stdout.flush()
@@ -152,11 +151,22 @@ try:
         print("  -> Headless fix applied: waysUsedInRelations populated (" + str(ways_in_relations.size()) + " ways).")
         sys.stdout.flush()
 
+    def should_keep_error(err):
+        try:
+            tester_name = err.getTester().getName()
+            message = str(err.getMessage() or "").strip().casefold()
+            if tester_name == "UntaggedWay" and message == "unnamed ways":
+                return False
+        except Exception:
+            pass
+        return True
+
     print("\nStarting validation process...")
     sys.stdout.flush()
     from java.util import ArrayList
     java_primitives = ArrayList(primitives)
     all_errors = []
+    suppressed_count = 0
 
     total_tests = len(test_list)
     for idx, test in enumerate(test_list, start=1):
@@ -173,10 +183,17 @@ try:
             test.visit(java_primitives)
             test.endTest()
             errs = test.getErrors()
-            found_count = len(errs) if errs else 0
+            kept_errors = []
             if errs:
-                all_errors.extend(errs)
-            print("      Finished in " + str(round(time.time() - t_start, 2)) + "s -> " + str(found_count) + " issue(s) found.")
+                for err in errs:
+                    if should_keep_error(err):
+                        kept_errors.append(err)
+                    else:
+                        suppressed_count += 1
+            found_count = len(kept_errors)
+            if kept_errors:
+                all_errors.extend(kept_errors)
+            print("      Finished in " + str(round(time.time() - t_start, 2)) + "s -> " + str(found_count) + " issue(s) kept.")
             sys.stdout.flush()
         except java.lang.Throwable as t:
             print("  [!] Skipping unstable rule (" + rule_name + "): " + str(t.getMessage()))
@@ -184,6 +201,9 @@ try:
         except Exception as e:
             print("  [!] Skipping unstable rule (" + rule_name + "): " + str(e))
             sys.stdout.flush()
+
+    print("Suppressed intentionally non-actionable 'unnamed ways' findings: " + str(suppressed_count))
+    sys.stdout.flush()
 
     geojson_output = {"type": "FeatureCollection", "features": []}
     for err in all_errors:

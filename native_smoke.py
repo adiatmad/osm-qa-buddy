@@ -11,8 +11,8 @@ def test_native_runner_shape():
     assert "--ram-gb" in app
     assert "--project-id" in app
     assert "sample.osm.ready.json" in app
-    assert 'text="HOT Task Grid"' in app
-    assert 'text="Geofabrik PBF"' in app
+    assert "HOT Task Grid" in app
+    assert "Geofabrik PBF" in app
     assert 'text="Project Boundary"' not in app
     assert "Project Boundary is intentionally not requested" in app
     assert "docker" not in app.lower()

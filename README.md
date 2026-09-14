@@ -1,186 +1,156 @@
 # OSM QA Buddy
 
-**An unofficial companion for HOT Tasking Manager projects, built to support third-pass QA.**
+**An unofficial companion for HOT Tasking Manager projects, built for third-pass QA.**
 
-<img width="1915" height="1008" alt="image" src="https://github.com/user-attachments/assets/9f5be7b9-3dde-4559-b452-3b68aab92447" />
+> **QA Buddy detects. The PM decides.**
 
-OSM QA Buddy helps a HOT Tasking Manager Project Manager answer one simple question:
-
-> **“After normal validation is finished, where should my validators look again?”**
-
-It runs established JOSM validation rules against completed project data, connects potential issues to Tasking Manager tasks, and highlights areas that deserve human review.
-
-**QA Buddy detects. The PM decides.**
+OSM QA Buddy runs established JOSM validation rules against already-completed HOT Tasking Manager project data, associates findings with tasks, and produces an explainable task-level triage layer for human review.
 
 ---
 
-## What this app is for
+## What it is for
 
-The project should already be **completed and 100% validated** in HOT Tasking Manager.
+The expected workflow is:
 
 ```text
 Mapping
-   ↓
+  ↓
 Normal validation
-   ↓
-100% validated project
-   ↓
+  ↓
+100% validated HOT TM project
+  ↓
 OSM QA Buddy
-   ↓
-Priority tasks / areas
-   ↓
+  ↓
+Task-level QA signals
+  ↓
 Human review
 ```
 
-QA Buddy is a **third-pass QA instrument**. It does not replace mapping or human validation.
+It is a **third-pass QA instrument**, not a replacement for mapping or human validation.
 
 ---
 
 ## Current workflow: native Windows
 
-The current working target is a **native Windows workflow**, not Docker.
-
-Docker files remain in the repository as a future packaging/Tech Team option, but they are **not required for the PM workflow**.
+The current PM workflow is native Windows. Docker remains in the repository only as a future Tech Team packaging option.
 
 ```text
 run_qa.bat
-    ↓
+  ↓
 Python GUI
-    ↓
-Enter HOT TM Project ID
-    ↓
-Open official download links
-    ↓
-Select AOI + Task Grid + Geofabrik PBF
-    ↓
-Choose Java/JOSM RAM
-    ↓
-START 3RD PASS VALIDATION
-    ↓
-native Osmium
-    ↓
+  ↓
+Optional HOT TM Project ID
+  ↓
+Select Boundary + Task Grid + Geofabrik PBF
+  ↓
+Preflight validation
+  ↓
+Native Osmium extraction
+  ↓
 JOSM 19613 + Jython 2.7.3
-    ↓
-GeoJSON summary + HTML report
+  ↓
+Task-level GeoJSON + HTML report
 ```
 
-The PM-facing goal is deliberately simple: **give the PM the GeoJSON summary and the HTML report, then let the PM decide where validators should look.**
+### Requirements
 
----
+- Windows
+- Python 3.12+ with Tkinter
+- 64-bit Java available as `java` on PATH
+- Osmium available as `osmium` on PATH
+- Git
+- No Docker required
 
-## PM workflow
-
-### 1. Install the host prerequisites
-
-On Windows, install:
-
-- **Python 3.12+** with Tkinter
-- **64-bit Java** available as `java` on PATH
-- **Osmium** (`osmium` available on PATH)
-- **Git**
-
-You do **not** need Docker for the current workflow.
-
-Check the important commands:
+Check the host:
 
 ```powershell
 python --version
 java -version
 osmium --version
+git --version
 ```
 
-### 2. Clone the repository
+---
+
+## Quick start
+
+Clone once:
 
 ```powershell
 git clone https://github.com/adiatmad/osm-qa-buddy.git
 cd osm-qa-buddy
 ```
 
-### 3. Launch QA Buddy
+Then launch:
 
 ```powershell
 .\run_qa.bat
 ```
 
-The launcher selects a suitable Python 3.12+ interpreter. `setup_native.py` checks Java and Osmium and downloads the pinned JOSM and Jython files if needed.
+`run_qa.bat` selects Python 3.12+, runs native prerequisite setup, downloads the pinned JOSM/Jython runtimes when needed, and opens the GUI.
 
 Pinned QA components:
 
-- **JOSM tested revision: 19613**
-- **Jython: 2.7.3**
+- JOSM tested revision: **19613**
+- Jython: **2.7.3**
 
-You can also run setup and the GUI directly:
+---
 
-```powershell
-py -3.12 setup_native.py
-py -3.12 app.py
-```
+## GUI workflow
 
-### 4. Enter the HOT TM Project ID
+### 1. Project ID — optional
 
-For example:
+A numeric HOT TM Project ID is useful because QA Buddy can construct the official AOI and Task Grid download links.
 
-```text
-63564
-```
+**It is not required to run QA.** If you already have the three source files, leave the Project ID blank.
 
-The numeric ID is used to construct the official Tasking Manager download links.
+This is intentional: the QA engine should validate the **contents of the selected files**, not depend on filenames or require a HOT TM project ID when the data is already available.
 
-### 5. Download and select the three source files
+### 2. Select the three source files
 
-QA Buddy intentionally **does not automatically download the project source data**. You choose the exact files that will be audited.
+Select:
 
-You need:
+1. **Project Boundary** — HOT TM AOI GeoJSON
+2. **Task Grid** — HOT TM task GeoJSON
+3. **Geofabrik PBF** — matching country/regional `.osm.pbf`
 
-1. **Project Boundary** — HOT Tasking Manager AOI
-2. **Task Grid** — HOT Tasking Manager tasks
-3. **OSM data** — a matching country/regional `.osm.pbf` from Geofabrik
+**Filename patterns are not required.** `nepal-aoi.geojson`, `my_boundary.geojson`, `tasks_final.geojson`, or Windows duplicate names such as `(1)` are all acceptable if their contents are valid.
 
-Expected filename patterns:
+Preflight validates the actual data before JOSM starts.
 
-| File | Expected filename |
-|---|---|
-| Project Boundary | ends with `-aoi.geojson` |
-| Task Grid | ends with `-tasks.geojson` |
-| Geofabrik data | ends with `.osm.pbf` |
+### 3. Choose Java/JOSM RAM
 
-Windows duplicate names such as `(1)` are accepted.
-
-### 6. Choose Java/JOSM RAM
-
-The GUI lets you choose the Java heap, for example:
+Example:
 
 ```text
 Java/JOSM RAM (GB): 24
 ```
 
-QA Buddy passes that value directly to Java as `-Xmx`. Do not allocate more RAM than the computer can spare.
+This is passed directly to Java as `-Xmx`. Do not allocate more RAM than the machine can spare.
 
-### 7. Start validation
+### 4. Start validation
 
 Click:
 
 **START 3RD PASS VALIDATION**
 
-The GUI shows the native processing log live.
+The GUI displays the native pipeline log live.
 
-The pipeline performs:
+---
 
-1. input preflight
-2. Osmium clipping of the regional PBF to the project boundary
-3. HOT TM MapCSS rule preparation using Python 3
-4. JOSM/Jython validation
-5. task-level finding aggregation
-6. GeoJSON and HTML output generation
+## What happens during a run
 
-### 8. Use the result
+1. Validate the selected files.
+2. Normalize the project boundary for Osmium extraction.
+3. Clip the regional PBF with native Osmium.
+4. Prepare HOT TM MapCSS rules with Python 3.
+5. Run JOSM 19613 through Jython 2.7.3.
+6. Aggregate findings against Tasking Manager task polygons.
+7. Generate GeoJSON, HTML, map, and technical metadata.
 
-The two important PM-facing outputs are:
+If preflight fails, QA stops instead of silently producing a misleading result.
 
-- **`task_grid_qa_summary.geojson`** — the primary GIS/task-prioritization output
-- **`report.html`** — the primary human-readable summary
-
-Open the GeoJSON in your normal GIS/map workflow. Use the HTML report when you want the overall QA picture and supporting details.
+Each run records input filenames, file sizes, SHA-256 hashes, Java/JOSM/Jython/Osmium versions, and extracted-dataset information in `run_metadata.json`.
 
 ---
 
@@ -188,9 +158,7 @@ Open the GeoJSON in your normal GIS/map workflow. Use the HTML report when you w
 
 ### `task_grid_qa_summary.geojson`
 
-This is the main PM-facing output.
-
-It keeps the Tasking Manager task grid and adds QA information to each task, including fields such as:
+The main PM-facing output. It keeps the Tasking Manager task grid and adds fields such as:
 
 - `taskId`
 - `taskStatus`
@@ -203,63 +171,82 @@ It keeps the Tasking Manager task grid and adds QA information to each task, inc
 - `qa_badimagery`
 - `qa_priority`
 
-The goal is simple:
+Use it to answer:
 
-> **Find the tasks that deserve attention first.**
+> **Which tasks deserve human attention first?**
 
 ### `report.html`
 
-The human-readable QA summary. It provides the overall finding counts, duplicate-finding information, task-level results, BADIMAGERY information, and supporting run details.
+The human-readable QA summary, including overall findings, duplicate information, task-level results, BADIMAGERY information, and run details.
 
----
-
-## Other outputs
-
-These are useful supporting artifacts, but they are **not required for the normal PM workflow**:
+### Supporting outputs
 
 | File | Purpose |
 |---|---|
-| `map.html` | Interactive map of tasks and findings |
+| `map.html` | Interactive map |
 | `qa_errors.geojson` | Raw JOSM findings |
-| `sample.osm` | OSM data clipped to the project area |
-| `qa_run.log` | Native processing log |
-| `run_metadata.json` | Technical/toolchain run metadata |
-
-If you are a PM, start with **`task_grid_qa_summary.geojson` and `report.html`**.
+| `sample.osm` | Osmium-clipped OSM dataset |
+| `qa_run.log` | Full native processing log |
+| `run_metadata.json` | Reproducibility/toolchain metadata |
 
 ---
 
-## What the QA result means
+## Interpreting the result
 
-QA Buddy can identify signals such as:
+Findings are **signals for human review**, not proof that mapping is wrong.
 
-- suspicious tagging
-- duplicated nodes
-- crossing ways
-- untagged or empty ways
-- other issues detected by JOSM validation rules
-- tasks marked **BADIMAGERY** by Tasking Manager
+A task with no findings is also not proof that it is perfect.
 
-These are **potential issues**, not automatic proof that the mapping is wrong.
+> **QA Buddy detects → PM reviews the evidence → validators make the final decision.**
 
-A task with no findings is also **not proof that the task is perfect**.
+### `qa_priority`
 
-The rule is:
+This is an explainable triage signal, not an AI quality score:
 
-> **QA Buddy detects → the PM reviews the evidence → validators make the final decision.**
-
----
-
-## Priority field
-
-`qa_priority` is an explainable triage signal, not an AI quality score.
-
-- **HIGH** — BADIMAGERY, or at least 5 unique findings, or at least 5 unique OSM objects
+- **HIGH** — BADIMAGERY, or at least 5 unique findings, or 5+ unique OSM objects
 - **MEDIUM** — 2–4 unique findings or 2–4 unique OSM objects
 - **LOW** — one finding without a HIGH/MEDIUM signal
 - **NONE** — no QA finding signal and not BADIMAGERY
 
-The priority is intended to help a PM decide **where to look first**, not to replace human judgment.
+---
+
+## Verified large-area baseline
+
+A real native Windows run completed successfully on **2026-09-14** with:
+
+- Boundary: `nepal-aoi.geojson`
+- Task Grid: `tasks_nepal-tasks.geojson`
+- PBF: `nepal-260913.osm.pbf`
+- Java/JOSM heap: 24 GB
+- Osmium: 1.19.1
+- JOSM: 19613
+- Jython: 2.7.3
+
+Osmium produced:
+
+- **226,902 nodes**
+- **27,848 ways**
+- **140 relations**
+- **254,890 total OSM objects**
+
+JOSM loaded **260,816 objects** and completed validation in approximately **31 minutes**.
+
+The dominant validator was `Ways` / CrossingWays:
+
+```text
+Ways: 1853.88 seconds (~30.9 minutes)
+```
+
+The completed run produced:
+
+- **856 raw JOSM findings**
+- **747 task-associated findings**
+- **109 unassigned findings**
+- **1 BADIMAGERY task**
+
+This is a **reproducibility baseline, not a performance guarantee**. CrossingWays is a full-dataset spatial test and runtime depends heavily on the geometry and density of the extracted OSM data.
+
+Long periods without new JOSM validator output are therefore not automatically a hang. The native orchestrator emits a 30-second heartbeat while JOSM is still running.
 
 ---
 
@@ -267,7 +254,7 @@ The priority is intended to help a PM decide **where to look first**, not to rep
 
 ### HOT Tasking Manager
 
-Project Boundary:
+Boundary:
 
 ```text
 https://tasking-manager-production-api.hotosm.org/api/v2/projects/<PROJECT_ID>/queries/aoi/?as_file=true
@@ -285,78 +272,66 @@ https://tasking-manager-production-api.hotosm.org/api/v2/projects/<PROJECT_ID>/t
 https://download.geofabrik.de/
 ```
 
-### HOT TM validation rules
-
-During a run, Python 3 downloads the HOT Tasking Manager MapCSS rules before Jython/JOSM starts:
+### HOT TM MapCSS rules
 
 ```text
 https://josm.openstreetmap.de/josmfile?page=Rules/ValidatingBuildingsInHOTTMProjects&zip=1
 ```
 
-External rule preparation uses normal Python 3 because older Jython HTTPS support can fail on some computers.
+Rules are downloaded with Python 3 before Jython/JOSM starts because older Jython HTTPS support can fail on some systems.
 
 ---
 
-## Native toolchain
+## Reproducibility notes
 
-QA Buddy pins the QA-side Java components for reproducibility:
+The QA-side Java components are pinned:
 
 | Component | Version |
 |---|---|
 | JOSM tested revision | `19613` |
 | Jython | `2.7.3` |
-| Java heap | selected by user in GUI |
-| Osmium | native host installation |
+| Java heap | Selected in GUI |
+| Osmium | Native host installation |
 
-`setup_native.py` downloads the pinned JOSM and Jython JARs into the local `tools/` directory. They are not committed to Git because they are binary dependencies.
+`setup_native.py` downloads and SHA-256 verifies the JOSM JAR. Runtime JARs are intentionally not committed to Git.
 
-The JOSM download is SHA-256 verified before use.
+For a reproducible test, keep the same:
 
----
+- Boundary data
+- Task Grid data
+- PBF snapshot
+- Osmium version
+- JOSM/Jython versions
+- Java heap
 
-## Safety checks
-
-Before JOSM validation starts, QA Buddy checks that:
-
-- the selected files exist and can be read
-- the Project Boundary is valid polygon data
-- the Task Grid is valid polygon data
-- the Task Grid overlaps the Project Boundary
-- the Geofabrik PBF can be read by Osmium
-- the HOT TM MapCSS rules were successfully prepared
-- the pinned JOSM/Jython files are available
-- Java and Osmium are available on PATH
-
-If these checks fail, QA stops instead of quietly producing a misleading result.
+The run metadata records these inputs and versions so a slow or suspicious result can be investigated instead of guessed at.
 
 ---
 
-## Example: HOT TM Project 63564
+## Development methodology
 
-A real Windows run of the QA pipeline has been completed for HOT TM Project **63564** using the JOSM/Jython validator stack.
+Coding work on this repository follows a proportional **Spec Kit + Anti-Slop** approach:
 
-The run demonstrated the intended PM workflow: raw JOSM findings are technical details, while the PM primarily needs to know **where to focus human review**.
+- **Spec Kit**: specify the problem → plan → implement → converge.
+- **Anti-Slop**: evidence before claims, minimal necessary complexity, intentional changes, and no cargo-cult engineering.
+- **Performance/debugging**: reproduce and measure before making speculative optimizations.
+
+The goal is not process for its own sake. The goal is to make the smallest change that solves the real problem and can be reproduced by another person.
 
 ---
 
 ## Docker status
 
-Docker is **not part of the current PM workflow**.
+Docker is **not part of the current PM workflow**. Docker-related files remain for future Tech Team packaging.
 
-The repository still contains Docker-related files because the longer-term goal is to let the Tech Team package and standardize the environment later.
+For current testing:
 
-For now:
-
-> **If you want to test QA Buddy today, use the native Windows workflow.**
+> **Use the native Windows workflow.**
 
 ---
 
 ## Development status
 
-This is an **unofficial tool under active development**.
+OSM QA Buddy is an **unofficial tool under active development**.
 
-The repository includes checks for Python syntax, QA aggregation, priority logic, report/map generation, and other supporting behavior.
-
-Real-world testing and skeptical review are encouraged.
-
-If something looks wrong, treat the result as a signal to investigate—not as an unquestionable answer.
+Treat QA output as evidence to investigate, not as an unquestionable answer.

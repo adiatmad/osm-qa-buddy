@@ -1,7 +1,9 @@
 import os
+import shutil
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
@@ -72,6 +74,12 @@ class App(tk.Tk):
         ttk.Label(action, text="RAM is passed directly to Java as -Xmx. Do not allocate more than your computer can spare.", wraplength=720).pack(anchor="w", pady=(0, 6))
         self.run_button = ttk.Button(action, text="START 3RD PASS VALIDATION", command=self.start_validation, state="disabled")
         self.run_button.pack(anchor="w", ipadx=14, ipady=6)
+        handoff = ttk.Frame(action); handoff.pack(fill="x", pady=(8, 0))
+        self.josm_button = ttk.Button(handoff, text="Open Clipped OSM in JOSM", command=self.open_josm, state="disabled")
+        self.josm_button.pack(side="left", padx=(0, 5))
+        self.folder_button = ttk.Button(handoff, text="Open Clipped OSM Folder", command=self.open_results_folder, state="disabled")
+        self.folder_button.pack(side="left", padx=5)
+        ttk.Label(action, text="These buttons become available as soon as the clipped OSM dataset is ready; QA can continue in the background.", wraplength=720).pack(anchor="w", pady=(5, 0))
 
         checks = ttk.LabelFrame(root, text="5. Validation status / live log", padding=8)
         checks.pack(fill="both", expand=True)
@@ -179,19 +187,35 @@ class App(tk.Tk):
                 command.extend(["--project-id", project_id])
             self.after(0, lambda: self._append_log("\nNATIVE WINDOWS QA LIVE LOG\n" + "=" * 80 + "\n"))
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=repo_dir, env=env)
+            handoff_started = False
             log_lines = []
             assert process.stdout is not None
-            for raw_line in iter(process.stdout.readline, ""):
-                line = raw_line.rstrip("\r\n")
-                log_lines.append(line)
-                self.after(0, lambda text=line: self._append_log(text + "\n"))
+            while True:
+                if not handoff_started:
+                    source = Path(work_dir, "sample.osm")
+                    if source.is_file() and source.stat().st_size > 0:
+                        josm_dataset = self._create_josm_dataset(work_dir, output_dir)
+                        handoff_started = True
+                        self.after(0, lambda path=josm_dataset: self._josm_dataset_ready(output_dir, path))
+                raw_line = process.stdout.readline()
+                if raw_line:
+                    line = raw_line.rstrip("\r\n")
+                    log_lines.append(line)
+                    self.after(0, lambda text=line: self._append_log(text + "\n"))
+                    continue
+                if process.poll() is not None:
+                    break
+                time.sleep(0.5)
             process.stdout.close()
             returncode = process.wait()
             log_path = os.path.join(output_dir, "qa_run.log")
             Path(log_path).write_text("\n".join(log_lines) + "\n", encoding="utf-8")
             if returncode != 0:
                 raise RuntimeError(f"Native QA failed (exit code {returncode}). Full log saved to:\n{log_path}")
-            josm_dataset = self._create_josm_dataset(work_dir, output_dir)
+            if not handoff_started:
+                josm_dataset = self._create_josm_dataset(work_dir, output_dir)
+            else:
+                josm_dataset = self.last_josm_dataset or self._create_josm_dataset(work_dir, output_dir)
             self.after(0, lambda: self._native_done(output_dir, log_path, josm_dataset))
         except Exception as exc:
             message = str(exc)
@@ -203,13 +227,20 @@ class App(tk.Tk):
             raise RuntimeError("QA completed, but the extracted OSM dataset was not found at:\n" + str(source))
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         destination = Path(output_dir, f"osm_qa_buddy_josm_{timestamp}.osm")
-        import shutil
         shutil.copy2(source, destination)
         return str(destination)
 
+    def _josm_dataset_ready(self, output_dir, josm_dataset):
+        self.last_output_dir = output_dir
+        self.last_josm_dataset = josm_dataset
+        self.josm_button.configure(state="normal")
+        self.folder_button.configure(state="normal")
+        self.status.set("Clipped OSM is ready. You can open it in JOSM while automated QA continues.")
+        self._append_log("\n" + "-" * 80 + "\nJOSM HANDOFF READY\nClipped OSM dataset:\n" + josm_dataset + "\nYou may now open this dataset in JOSM GUI; automated QA continues independently.\n" + "-" * 80 + "\n")
+
     def _find_josm_launcher(self):
         for name in ("josm.exe", "JOSM.exe", "josm"):
-            found = shutil.which(name) if "shutil" in globals() else None
+            found = shutil.which(name)
             if found:
                 return [found]
         jar = Path(os.path.dirname(os.path.abspath(__file__)), "tools", "josm-19613.jar")
@@ -219,7 +250,7 @@ class App(tk.Tk):
 
     def open_josm(self):
         if not self.last_josm_dataset or not Path(self.last_josm_dataset).is_file():
-            messagebox.showerror("JOSM dataset unavailable", "The JOSM-ready OSM file is not available.")
+            messagebox.showerror("JOSM dataset unavailable", "The JOSM-ready OSM file is not available yet.")
             return
         launcher = self._find_josm_launcher()
         if not launcher:
@@ -227,7 +258,7 @@ class App(tk.Tk):
             return
         try:
             subprocess.Popen(launcher + [self.last_josm_dataset], cwd=os.path.dirname(self.last_josm_dataset))
-            self.status.set("JOSM launched with the extracted project dataset.")
+            self.status.set("JOSM launched with the extracted project dataset. Automated QA continues in the background.")
         except Exception as exc:
             messagebox.showerror("Could not launch JOSM", str(exc))
 
@@ -238,6 +269,8 @@ class App(tk.Tk):
     def _native_done(self, output_dir, log_path, josm_dataset):
         self.last_output_dir = output_dir
         self.last_josm_dataset = josm_dataset
+        self.josm_button.configure(state="normal")
+        self.folder_button.configure(state="normal")
         self.progress.set(100)
         self.status.set("QA completed successfully. JOSM-ready dataset is available.")
         self._append_log("\n" + "=" * 80 + "\nQA COMPLETED SUCCESSFULLY\n\nJOSM-ready dataset:\n" + josm_dataset + "\n\nResults:\n" + output_dir + "\n\nFull log:\n" + log_path + "\n")
@@ -246,7 +279,7 @@ class App(tk.Tk):
         dialog.transient(self)
         dialog.grab_set()
         ttk.Label(dialog, text="3rd Pass Validation completed.", font=("Segoe UI", 11, "bold")).pack(padx=20, pady=(18, 6))
-        ttk.Label(dialog, text="A timestamped OSM dataset has been prepared for interactive JOSM validation.", wraplength=440).pack(padx=20, pady=(0, 14))
+        ttk.Label(dialog, text="A timestamped OSM dataset was prepared earlier and is available for interactive JOSM validation.", wraplength=440).pack(padx=20, pady=(0, 14))
         buttons = ttk.Frame(dialog); buttons.pack(padx=20, pady=(0, 18))
         ttk.Button(buttons, text="Open in JOSM", command=lambda: self.open_josm_and_close(dialog)).pack(side="left", padx=4)
         ttk.Button(buttons, text="Open Results Folder", command=self.open_results_folder).pack(side="left", padx=4)

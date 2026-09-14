@@ -28,6 +28,8 @@ class App(tk.Tk):
         self.status = tk.StringVar(value="Select the 3 input files to begin. Project ID is optional.")
         self.progress = tk.DoubleVar(value=0)
         self.aoi_url = self.tasks_url = None
+        self.last_output_dir = None
+        self.last_josm_dataset = None
 
         self._build_ui()
 
@@ -189,19 +191,74 @@ class App(tk.Tk):
             Path(log_path).write_text("\n".join(log_lines) + "\n", encoding="utf-8")
             if returncode != 0:
                 raise RuntimeError(f"Native QA failed (exit code {returncode}). Full log saved to:\n{log_path}")
-            self.after(0, lambda: self._native_done(output_dir, log_path))
+            josm_dataset = self._create_josm_dataset(work_dir, output_dir)
+            self.after(0, lambda: self._native_done(output_dir, log_path, josm_dataset))
         except Exception as exc:
             message = str(exc)
             self.after(0, lambda: self._native_failed(message))
 
-    def _native_done(self, output_dir, log_path):
+    def _create_josm_dataset(self, work_dir, output_dir):
+        source = Path(work_dir, "sample.osm")
+        if not source.is_file():
+            raise RuntimeError("QA completed, but the extracted OSM dataset was not found at:\n" + str(source))
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        destination = Path(output_dir, f"osm_qa_buddy_josm_{timestamp}.osm")
+        import shutil
+        shutil.copy2(source, destination)
+        return str(destination)
+
+    def _find_josm_launcher(self):
+        for name in ("josm.exe", "JOSM.exe", "josm"):
+            found = shutil.which(name) if "shutil" in globals() else None
+            if found:
+                return [found]
+        jar = Path(os.path.dirname(os.path.abspath(__file__)), "tools", "josm-19613.jar")
+        if jar.is_file():
+            return ["java", "-Xmx24g", "-jar", str(jar)]
+        return None
+
+    def open_josm(self):
+        if not self.last_josm_dataset or not Path(self.last_josm_dataset).is_file():
+            messagebox.showerror("JOSM dataset unavailable", "The JOSM-ready OSM file is not available.")
+            return
+        launcher = self._find_josm_launcher()
+        if not launcher:
+            messagebox.showerror("JOSM not found", "JOSM was not found on PATH and the bundled JOSM jar is unavailable.")
+            return
+        try:
+            subprocess.Popen(launcher + [self.last_josm_dataset], cwd=os.path.dirname(self.last_josm_dataset))
+            self.status.set("JOSM launched with the extracted project dataset.")
+        except Exception as exc:
+            messagebox.showerror("Could not launch JOSM", str(exc))
+
+    def open_results_folder(self):
+        if self.last_output_dir and Path(self.last_output_dir).is_dir():
+            os.startfile(self.last_output_dir)
+
+    def _native_done(self, output_dir, log_path, josm_dataset):
+        self.last_output_dir = output_dir
+        self.last_josm_dataset = josm_dataset
         self.progress.set(100)
-        self.status.set("QA completed successfully.")
-        self._append_log("\n" + "=" * 80 + "\nQA COMPLETED SUCCESSFULLY\n\nResults:\n" + output_dir + "\n\nFull log:\n" + log_path + "\n")
-        messagebox.showinfo("QA complete", "3rd Pass Validation completed.\n\nResults are in:\n" + output_dir)
+        self.status.set("QA completed successfully. JOSM-ready dataset is available.")
+        self._append_log("\n" + "=" * 80 + "\nQA COMPLETED SUCCESSFULLY\n\nJOSM-ready dataset:\n" + josm_dataset + "\n\nResults:\n" + output_dir + "\n\nFull log:\n" + log_path + "\n")
+        dialog = tk.Toplevel(self)
+        dialog.title("QA complete")
+        dialog.transient(self)
+        dialog.grab_set()
+        ttk.Label(dialog, text="3rd Pass Validation completed.", font=("Segoe UI", 11, "bold")).pack(padx=20, pady=(18, 6))
+        ttk.Label(dialog, text="A timestamped OSM dataset has been prepared for interactive JOSM validation.", wraplength=440).pack(padx=20, pady=(0, 14))
+        buttons = ttk.Frame(dialog); buttons.pack(padx=20, pady=(0, 18))
+        ttk.Button(buttons, text="Open in JOSM", command=lambda: self.open_josm_and_close(dialog)).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Open Results Folder", command=self.open_results_folder).pack(side="left", padx=4)
+        ttk.Button(buttons, text="Close", command=dialog.destroy).pack(side="left", padx=4)
         report = Path(output_dir, "report.html")
-        if report.exists(): webbrowser.open(report.as_uri())
+        if report.exists():
+            webbrowser.open(report.as_uri())
         self.run_button.configure(state="normal")
+
+    def open_josm_and_close(self, dialog):
+        self.open_josm()
+        dialog.destroy()
 
     def _native_failed(self, message):
         self.progress.set(0)

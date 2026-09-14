@@ -19,6 +19,18 @@ QA_BUDDY_VERSION = "0.1.0"
 JOSM_VERSION = "19613"
 JYTHON_VERSION = "2.7.3"
 HOT_RULES_URL = "https://josm.openstreetmap.de/josmfile?page=Rules/ValidatingBuildingsInHOTTMProjects&zip=1"
+THIRD_PASS_RULE_SOURCES = {
+    "mm_3rd_pass": {
+        "url": "https://raw.githubusercontent.com/MissingMaps/3rdPassJOSMRules/refs/heads/main/MM_3rdPassValidationRules.mapcss",
+        "type": "mapcss",
+        "filename": "MM_3rdPassValidationRules.mapcss",
+    },
+    "qa_tool_inspired": {
+        "url": "https://josm.openstreetmap.de/josmfile?page=Rules/QAToolInspiredValidations&zip=1",
+        "type": "zip",
+        "filename": "QAToolInspiredValidations.zip",
+    },
+}
 REPO_DIR = Path(__file__).resolve().parent
 TOOLS_DIR = REPO_DIR / "tools"
 JOSM_JAR = TOOLS_DIR / f"josm-{JOSM_VERSION}.jar"
@@ -73,6 +85,13 @@ def _update_run_metadata(path, **updates):
         print(f"  -> Warning: could not update run metadata: {exc}")
 
 
+def _download(url, destination):
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[*] Downloading validator rules: {url}")
+    with urllib.request.urlopen(url, timeout=60) as response, open(destination, "wb") as output:
+        shutil.copyfileobj(response, output)
+
+
 def prepare_hot_rules():
     extract_path = os.path.join(WORK_DIR, "hot_rules")
     if os.path.isdir(extract_path) and any(filename.endswith(".mapcss") for _, _, files in os.walk(extract_path) for filename in files):
@@ -89,6 +108,34 @@ def prepare_hot_rules():
     if not any(filename.endswith(".mapcss") for _, _, files in os.walk(extract_path) for filename in files): raise RuntimeError("HOT TM MapCSS rules ZIP was downloaded, but no .mapcss rule file was found.")
     print(f"  -> HOT TM MapCSS rules prepared in {extract_path}")
     return extract_path
+
+
+def prepare_additional_third_pass_rules():
+    rules_dir = Path(WORK_DIR) / "external_rules"
+    rules_dir.mkdir(parents=True, exist_ok=True)
+    prepared = []
+    for rule_id, source in THIRD_PASS_RULE_SOURCES.items():
+        destination = rules_dir / source["filename"]
+        try:
+            if not destination.exists() or destination.stat().st_size == 0:
+                _download(source["url"], destination)
+            if source["type"] == "mapcss":
+                prepared.append(str(destination))
+                continue
+            extract_dir = rules_dir / rule_id
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(str(destination), "r") as zip_ref:
+                zip_ref.extractall(str(extract_dir))
+            mapcss_files = sorted(str(path) for path in extract_dir.rglob("*.mapcss"))
+            if not mapcss_files:
+                raise RuntimeError("ZIP contains no .mapcss rule file")
+            prepared.extend(mapcss_files)
+        except Exception as exc:
+            raise RuntimeError(f"Could not prepare additional third-pass rules ({rule_id}):\n{exc}") from exc
+    print("[*] Additional third-pass MapCSS rules prepared:")
+    for path in prepared:
+        print("  -> " + path)
+    return prepared
 
 
 def _osmium_fileinfo(path):
@@ -189,7 +236,7 @@ def run_local_pipeline(pbf_path, aoi_path, tasks_path, output_dir=None, ram_gb=2
         if os.path.abspath(src) != os.path.abspath(dst): shutil.copy2(src, dst)
     aoi, tasks, pbf = (os.path.join(WORK_DIR, x) for x in ("project_aoi.geojson", "project_tasks.geojson", "region.osm.pbf"))
     sample_path = clip_pbf_with_osmium(aoi, pbf); _update_run_metadata(metadata_path, extracted_dataset={"path": sample_path, "size_bytes": os.path.getsize(sample_path), "osmium_fileinfo": _osmium_fileinfo(sample_path)})
-    prepare_hot_rules(); run_josm_qa_bot(ram_gb)
+    prepare_hot_rules(); prepare_additional_third_pass_rules(); run_josm_qa_bot(ram_gb)
     errors = os.path.join(WORK_DIR, "qa_errors.geojson"); summary = aggregate_errors_to_tasks(tasks, errors)
     report_path, map_path = os.path.join(WORK_DIR, "report.html"), os.path.join(WORK_DIR, "map.html")
     generate_report(errors, summary, report_path, map_path, metadata_path)

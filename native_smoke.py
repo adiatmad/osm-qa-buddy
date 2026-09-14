@@ -17,8 +17,10 @@ def test_native_runner_shape():
     assert "--project-id" in orchestrator
     assert "project_id=project_id" in orchestrator
     assert "JOSM_SHA256" in setup
-    assert "os.listdir(extract_path)" in bot
-    assert "for root, dirs, files in os.walk(extract_path)" in bot
+    assert "find_mapcss_files" in bot
+    assert "hot_rules_dir" in bot
+    assert "external_rules_dir" in bot
+    assert "should_keep_error" in bot
     assert "Processing objects " not in bot
     assert "batch_size = 10000" not in bot
 

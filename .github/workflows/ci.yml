@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Python syntax
-        run: python3 -m py_compile app.py orchestrator.py setup_native.py preflight.py report.py run_wizard.py test_smoke.py test_preflight.py test_report_integrity.py native_smoke.py
+        run: python3 -m py_compile app.py orchestrator.py gui_pipeline.py josm_validation_xml.py setup_native.py preflight.py report.py run_wizard.py test_smoke.py test_preflight.py test_report_integrity.py native_smoke.py tests/test_josm_validation_xml.py
       - name: Install test dependencies
         run: python3 -m pip install -r requirements.txt
       - name: Run smoke tests
@@ -20,6 +20,8 @@ jobs:
         run: python3 -m unittest test_preflight.py
       - name: Run report integrity regression tests
         run: python3 -m unittest test_report_integrity.py
+      - name: Run JOSM validation XML parser tests
+        run: python3 -m unittest tests/test_josm_validation_xml.py
       - name: Run native workflow checks
         run: python3 native_smoke.py
       - name: Build Docker image

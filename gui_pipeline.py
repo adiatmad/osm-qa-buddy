@@ -17,7 +17,6 @@ from pathlib import Path
 
 
 def _load_components():
-    # orchestrator reads WORK_DIR at import time, so the caller must set it first.
     from orchestrator import (
         WORK_DIR,
         aggregate_errors_to_tasks,
@@ -99,7 +98,7 @@ def prepare_gui_run(pbf_path, tasks_path, output_dir, project_id=None):
     shutil.copy2(metadata_path, os.path.join(output_dir, "run_metadata.json"))
     print("[+] GUI VALIDATION PREPARED")
     print(f"[+] JOSM DATASET: {output_sample}")
-    print("[+] NEXT: Open the dataset in normal JOSM, run Validator, review the requested building/highway-focused results, then save the Validation errors layer as XML.")
+    print("[+] NEXT: Open the dataset in normal JOSM, run Validator, review building/highway-related results, then save the Validation errors layer as XML.")
     return output_sample
 
 
@@ -118,8 +117,12 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
             "GUI run metadata is missing. Run 'prepare' first and use the same QABOT_WORK_DIR when finalizing."
         )
 
+    sample_path = os.path.join(work_dir, "sample.osm")
+    if not os.path.isfile(sample_path):
+        raise RuntimeError("Prepared JOSM sample is missing. Run 'prepare' first and use the same QABOT_WORK_DIR when finalizing.")
+
     raw_findings = c["parse_josm_validation_xml"](xml_path)
-    findings, filtered_out_count = c["filter_josm_findings"](raw_findings)
+    findings, filtered_out_count = c["filter_josm_findings"](raw_findings, sample_path)
     errors_path = os.path.join(work_dir, "qa_errors.geojson")
     c["write_geojson"](findings, errors_path)
 

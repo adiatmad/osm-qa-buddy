@@ -2,8 +2,14 @@
 
 JOSM remains the validation engine. This module does not recreate JOSM
 validation rules; it classifies native exported findings using the affected
-OSM primitives when the prepared sample is available, with a text fallback
-for explicitly named JOSM/HOT rules.
+OSM primitives whenever the prepared sample is available.
+
+The classification is deliberately semantic:
+- findings affecting ``building=*`` objects are kept;
+- findings affecting ``highway=*`` objects are kept;
+- generic TagChecker and DuplicateNode findings are always kept;
+- Address findings are excluded;
+- explicitly named building/highway rules are retained as a fallback.
 """
 
 from __future__ import annotations
@@ -13,11 +19,23 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 _ALWAYS_KEEP_RULES = {"TagChecker", "DuplicateNode"}
-_BUILDING_TERMS = ("building", "right angle building", "overlapping building", "unclosed building", "building area", "building size")
+_BUILDING_TERMS = (
+    "building",
+    "right angle building",
+    "overlapping building",
+    "unclosed building",
+    "building area",
+    "building size",
+)
+# Keep this fallback intentionally narrow. Generic terms such as "street",
+# "path", or "road" are too ambiguous when no OSM sample is available.
 _HIGHWAY_TERMS = (
-    "highway", "road", "motorway", "trunk road", "primary road", "secondary road",
-    "tertiary road", "residential road", "service road", "living street", "street",
-    "footway", "cycleway", "path", "pedestrian", "bridleway", "steps", "track",
+    "highway",
+    "highways",
+    "sharp angles on roads",
+    "crossing highway",
+    "way end node near other highway",
+    "highway without a reference",
 )
 _ADDRESS_TERMS = ("address", "addresses", "addr:")
 
@@ -63,7 +81,13 @@ def load_osm_feature_tags(osm_path: str | Path) -> tuple[dict[str, dict[str, str
     return tags, members
 
 
-def _object_has_theme(object_id: str, theme: str, tags: dict[str, dict[str, str]], members: dict[str, list[str]], seen: set[str] | None = None) -> bool:
+def _object_has_theme(
+    object_id: str,
+    theme: str,
+    tags: dict[str, dict[str, str]],
+    members: dict[str, list[str]],
+    seen: set[str] | None = None,
+) -> bool:
     seen = seen or set()
     if object_id in seen:
         return False
@@ -86,10 +110,16 @@ def is_target_josm_finding(
     class_title = str(finding.get("rule_detail", ""))
     message = str(finding.get("message", ""))
 
+    # User explicitly requested these two generic families regardless of the
+    # affected object's feature type.
     if analyser in _ALWAYS_KEEP_RULES:
         return True
 
     text = _normalise(analyser, class_title, message)
+
+    # Address is explicitly excluded, even when the finding also mentions a
+    # building. TagChecker is handled above because generic tagging errors are
+    # explicitly retained by the requested policy.
     if _contains_term(text, _ADDRESS_TERMS):
         return False
 

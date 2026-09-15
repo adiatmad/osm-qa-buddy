@@ -27,7 +27,7 @@ Your OSM data + Task Grid
         ↓
    Run JOSM Validator
         ↓
- Save Validation errors.xml
+ Save Validation errors XML
         ↓
    QA Buddy finalizes
         ↓
@@ -142,13 +142,15 @@ Then:
 4. Review the validation results.
 5. Select the **Validation errors** layer.
 6. Use **File → Save As**.
-7. Save it as an XML file, for example:
+7. Save the validation results as an XML file.
+
+**The XML can have any filename and can be saved in any folder.** For example:
 
 ```text
-C:\data\qa-result\validation_errors.xml
+C:\data\qa-result\my_josm_check.xml
 ```
 
-That's the only manual JOSM step QA Buddy needs.
+QA Buddy does not depend on the name `validation_errors.xml`, and it does not require the XML to be in the QA Buddy output folder. If the JOSM GUI lets you save it there, that is fine.
 
 ---
 
@@ -157,10 +159,12 @@ That's the only manual JOSM step QA Buddy needs.
 Back in Command Prompt, run:
 
 ```cmd
-python -u gui_pipeline.py finalize "C:\data\tasks_nepal-tasks.geojson" "C:\data\qa-result\validation_errors.xml" "C:\data\qa-result"
+python -u gui_pipeline.py finalize "C:\data\tasks_nepal-tasks.geojson" "C:\data\qa-result\my_josm_check.xml" "C:\data\qa-result"
 ```
 
 Replace the paths with your own.
+
+**The second path is simply the XML file you picked/saved in JOSM.** Its filename and location do not matter; the exact path you provide does.
 
 If everything is OK, you will see:
 
@@ -301,7 +305,7 @@ sample.osm.ready.json
 
 ### Finalize says the XML is missing
 
-Check that JOSM actually saved the **Validation errors** layer as XML and that the path in your `finalize` command points to that file.
+Check that JOSM actually saved the **Validation errors** layer as XML and that the path in your `finalize` command points to that file. The XML filename and folder can be anything; the path just needs to point to the file you saved.
 
 ### There are many findings
 

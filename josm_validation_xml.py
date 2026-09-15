@@ -54,7 +54,7 @@ def _class_map(analyser: ET.Element) -> dict[str, dict[str, str]]:
                     break
         classes[class_id] = {
             "severity": _LEVEL_TO_SEVERITY.get(level, f"LEVEL_{level or 'UNKNOWN'}"),
-            "rule": title or f"JOSM class {class_id}",
+            "class_title": title or f"JOSM class {class_id}",
         }
     return classes
 
@@ -88,7 +88,7 @@ def parse_josm_validation_xml(path: str | Path) -> list[dict]:
             class_id = error.get("class", "")
             error_class = classes.get(class_id, {})
             severity = error_class.get("severity", "UNKNOWN")
-            rule = error_class.get("rule", analyser_name)
+            class_title = error_class.get("class_title", f"JOSM class {class_id or 'UNKNOWN'}")
 
             location = None
             message = ""
@@ -109,7 +109,7 @@ def parse_josm_validation_xml(path: str | Path) -> list[dict]:
                 elif name == "text":
                     message = _text_value(child, "value")
 
-            if not location:
+            if location is None:
                 # JOSM normally writes a location for every TestError. Do not
                 # fabricate coordinates if a malformed/foreign file omits it.
                 continue
@@ -121,7 +121,8 @@ def parse_josm_validation_xml(path: str | Path) -> list[dict]:
             findings.append(
                 {
                     "severity": severity,
-                    "rule": rule,
+                    "rule": analyser_name,
+                    "rule_detail": class_title,
                     "message": message,
                     "object_id": object_ids[0],
                     "object_ids": object_ids,
@@ -148,6 +149,7 @@ def write_geojson(findings: list[dict], output_path: str | Path) -> Path:
                 "geometry": {"type": "Point", "coordinates": finding["coordinates"]},
                 "properties": {
                     "rule": finding["rule"],
+                    "rule_detail": finding["rule_detail"],
                     "message": finding["message"],
                     "severity": finding["severity"],
                     "object_id": finding["object_id"],

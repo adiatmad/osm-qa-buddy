@@ -34,7 +34,26 @@ task-level outputs. JOSM remains the validation engine.
 
 ## Acceptance boundary
 
-Automated tests can establish code correctness. A native Windows/JOSM run with
-a real Validator export remains necessary before the bridge is
-production-validated.
+Automated tests establish parser and pipeline behavior. The production acceptance boundary also requires a real native Windows/JOSM run because automated tests cannot establish the behavior of the installed JOSM GUI exporter.
 
+## Acceptance evidence
+
+A real Windows acceptance run was completed on 2026-09-15 using JOSM 19613 and the Nepal test dataset. The workflow successfully:
+
+1. prepared an Osmium-clipped `sample.osm`;
+2. opened that dataset in normal JOSM;
+3. ran the normal JOSM Validator;
+4. exported the native Validation errors XML;
+5. finalized that XML through QA Buddy; and
+6. produced the established downstream GeoJSON, HTML report, and map outputs.
+
+Observed result:
+
+- 17,202 raw JOSM findings parsed;
+- 15,768 findings associated with Task Grid polygons;
+- 1,435 findings remained unassigned;
+- 1 BADIMAGERY task was detected.
+
+The unassigned findings are preserved rather than forcibly attributed to tasks. Their presence is not by itself evidence of a parser or attribution failure and should be investigated from the underlying geometry/task boundaries when needed.
+
+The acceptance run establishes the GUI bridge as **field-validated for this workflow**, while not claiming universal correctness for every JOSM version, dataset, validator configuration, or task-grid geometry.

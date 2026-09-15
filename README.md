@@ -30,9 +30,15 @@ It is a **third-pass QA instrument**, not a replacement for mapping or human val
 
 ---
 
-## Current workflow: native Windows
+## Current workflows: native Windows
 
-The current PM workflow is native Windows. Docker remains in the repository only as a future Tech Team packaging option.
+The current PM workflows are native Windows. Docker remains in the repository only as a future Tech Team packaging option.
+
+There are now two validation paths:
+
+### Native/headless workflow
+
+This is the existing automated workflow and remains the regression/development baseline.
 
 ```text
 run_qa.bat
@@ -51,6 +57,28 @@ JOSM 19613 + Jython 2.7.3
   ↓
 Task-level GeoJSON + HTML report
 ```
+
+### JOSM GUI Validation Bridge
+
+Use this path when the validation stage should be performed by the normal JOSM GUI. QA Buddy prepares the clipped dataset and consumes JOSM's native Validation errors XML; it does **not** reimplement or remotely drive JOSM validation.
+
+```text
+Task Grid + regional PBF
+  ↓
+QA Buddy prepare
+  ↓
+Osmium-clipped sample.osm
+  ↓
+Normal JOSM GUI Validator
+  ↓
+Save Validation errors XML
+  ↓
+QA Buddy finalize
+  ↓
+Existing task attribution + report + map
+```
+
+See [`docs/josm-gui-validation-bridge.md`](docs/josm-gui-validation-bridge.md) for the complete bridge workflow.
 
 ### Requirements
 
@@ -81,7 +109,7 @@ git clone https://github.com/adiatmad/osm-qa-buddy.git
 cd osm-qa-buddy
 ```
 
-Then launch:
+Then launch the existing native/headless workflow:
 
 ```powershell
 .\run_qa.bat
@@ -94,9 +122,13 @@ Pinned QA components:
 - JOSM tested revision: **19613**
 - Jython: **2.7.3**
 
+For the GUI Validation Bridge, run the `prepare` and `finalize` commands documented below rather than `run_qa.bat`.
+
 ---
 
 ## GUI workflow
+
+### Existing native/headless GUI
 
 ### 1. Project ID — optional
 
@@ -138,7 +170,40 @@ The GUI displays the native pipeline log live.
 
 ---
 
-## What happens during a run
+## JOSM GUI Validation Bridge
+
+This is a separate interactive validation path for users who want JOSM's normal GUI Validator to be the validation engine.
+
+### 1. Prepare
+
+```powershell
+$env:QABOT_WORK_DIR = "C:\path\to\osm-qa-buddy\work\gui-run"
+python gui_pipeline.py prepare "C:\data\region.osm.pbf" "C:\data\task_grid.geojson" "C:\data\qa-result"
+```
+
+QA Buddy creates an Osmium-clipped `sample.osm` and a `sample.osm.ready.json` handoff marker.
+
+**Open `sample.osm` in JOSM. Do not open `sample.osm.ready.json`.** The `.ready.json` file is metadata for the prepared run, not an OSM dataset.
+
+### 2. Validate in normal JOSM
+
+Open `sample.osm` in normal JOSM, run Validator with `Shift+V` with no selection so the whole clipped dataset is checked, and review the findings.
+
+Then select the **Validation errors** layer and use **Save As** to save the native Validation errors XML, normally as `validation_errors.xml`.
+
+### 3. Finalize
+
+```powershell
+python gui_pipeline.py finalize "C:\data\task_grid.geojson" "C:\data\qa-result\validation_errors.xml" "C:\data\qa-result"
+```
+
+QA Buddy parses the native JOSM XML and reuses the existing task attribution, reporting, and map generation. It does not create a second validator or reinterpret JOSM's rules.
+
+The bridge has been field-validated on Windows with a real JOSM 19613 export. See the bridge documentation for the acceptance evidence and boundary conditions.
+
+---
+
+## What happens during the native/headless run
 
 1. Validate the selected files.
 2. Normalize the project boundary for Osmium extraction.
@@ -185,7 +250,9 @@ The human-readable QA summary, including overall findings, duplicate information
 |---|---|
 | `map.html` | Interactive map |
 | `qa_errors.geojson` | Raw JOSM findings |
-| `sample.osm` | Osmium-clipped OSM dataset |
+| `sample.osm` | Osmium-clipped OSM dataset for the GUI bridge |
+| `sample.osm.ready.json` | GUI bridge handoff metadata; do not open as OSM |
+| `validation_errors.xml` | Native JOSM Validation errors export used by the GUI bridge |
 | `qa_run.log` | Full native processing log |
 | `run_metadata.json` | Reproducibility/toolchain metadata |
 

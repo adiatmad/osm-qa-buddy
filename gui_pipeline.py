@@ -2,7 +2,9 @@
 
 This module deliberately does not run JOSM's validator. Normal JOSM GUI owns
 validation and its rule configuration. QA Buddy prepares the clipped dataset,
-then consumes JOSM's native Validation errors XML export.
+then consumes JOSM's native Validation errors XML export and highlights the
+requested building/highway findings plus generic tagging and duplicate-node
+findings.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ def _load_components():
         write_run_metadata,
     )
     from josm_validation_xml import parse_josm_validation_xml, write_geojson
+    from josm_validation_filter import filter_josm_findings
 
     return {
         "WORK_DIR": WORK_DIR,
@@ -38,6 +41,7 @@ def _load_components():
         "validate_inputs": validate_inputs,
         "write_run_metadata": write_run_metadata,
         "parse_josm_validation_xml": parse_josm_validation_xml,
+        "filter_josm_findings": filter_josm_findings,
         "write_geojson": write_geojson,
     }
 
@@ -69,6 +73,7 @@ def prepare_gui_run(pbf_path, tasks_path, output_dir, project_id=None):
         validation_engine="JOSM GUI Validator + native Validation errors XML export",
         workflow_mode="interactive_gui",
         human_validation_required=True,
+        validation_filter="building + highway + generic tagging + duplicate nodes; address excluded",
     )
 
     for src, name in ((tasks_path, "project_tasks.geojson"), (pbf_path, "region.osm.pbf")):
@@ -94,7 +99,7 @@ def prepare_gui_run(pbf_path, tasks_path, output_dir, project_id=None):
     shutil.copy2(metadata_path, os.path.join(output_dir, "run_metadata.json"))
     print("[+] GUI VALIDATION PREPARED")
     print(f"[+] JOSM DATASET: {output_sample}")
-    print("[+] NEXT: Open the dataset in normal JOSM, run Validator, then save the Validation errors layer as XML.")
+    print("[+] NEXT: Open the dataset in normal JOSM, run Validator, review the requested building/highway-focused results, then save the Validation errors layer as XML.")
     return output_sample
 
 
@@ -113,7 +118,8 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
             "GUI run metadata is missing. Run 'prepare' first and use the same QABOT_WORK_DIR when finalizing."
         )
 
-    findings = c["parse_josm_validation_xml"](xml_path)
+    raw_findings = c["parse_josm_validation_xml"](xml_path)
+    findings, filtered_out_count = c["filter_josm_findings"](raw_findings)
     errors_path = os.path.join(work_dir, "qa_errors.geojson")
     c["write_geojson"](findings, errors_path)
 
@@ -128,7 +134,10 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
             "path": str(xml_path.resolve()),
             "size_bytes": xml_path.stat().st_size,
         },
+        josm_raw_finding_count=len(raw_findings),
         josm_finding_count=len(findings),
+        josm_filtered_out_count=filtered_out_count,
+        validation_filter="building + highway + generic tagging + duplicate nodes; address excluded",
     )
     c["generate_report"](errors_path, summary_path, report_path, map_path, metadata_path)
 
@@ -149,7 +158,9 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
     if xml_path.resolve() != Path(destination_xml).resolve():
         shutil.copy2(xml_path, destination_xml)
 
-    print(f"[+] JOSM FINDINGS: {len(findings)}")
+    print(f"[+] JOSM RAW FINDINGS: {len(raw_findings)}")
+    print(f"[+] TARGET FINDINGS: {len(findings)}")
+    print(f"[+] FILTERED OUT: {filtered_out_count}")
     print(f"[+] SUMMARY: {summary_path}")
     print(f"[+] REPORT: {report_path}")
     print(f"[+] MAP: {map_path}")
@@ -174,4 +185,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

@@ -71,24 +71,35 @@ def parse_josm_validation_xml(path: str | Path) -> list[dict]:
     if not source.is_file():
         raise FileNotFoundError(f"JOSM validation XML not found: {source}")
 
-    root = ET.parse(source).getroot()
-    if _local_name(root.tag) != "analysers":
-        raise ValueError("Not a JOSM Validation errors XML file: root element must be <analysers>")
+    try:
+        root = ET.parse(source).getroot()
+    except ET.ParseError as exc:
+        raise ValueError(f"Invalid JOSM Validation errors XML: {source}: {exc}") from exc
+    if _local_name(root.tag) != "analysers" or root.get("generator") != "JOSM":
+        raise ValueError("Not a JOSM Validation errors XML file: expected <analysers generator='JOSM'> root")
 
     findings: list[dict] = []
+    seen_findings: set[tuple] = set()
     for analyser in root:
         if _local_name(analyser.tag) != "analyser":
             continue
-        analyser_name = _text_value(analyser, "name", "Unknown")
+        analyser_name = _text_value(analyser, "name")
+        if not analyser_name:
+            raise ValueError("Invalid JOSM Validation errors XML: analyser is missing its name")
         classes = _class_map(analyser)
 
-        for error in analyser:
+        for error_number, error in enumerate(analyser, start=1):
             if _local_name(error.tag) != "error":
                 continue
             class_id = error.get("class", "")
-            error_class = classes.get(class_id, {})
-            severity = error_class.get("severity", "UNKNOWN")
-            class_title = error_class.get("class_title", f"JOSM class {class_id or 'UNKNOWN'}")
+            if class_id not in classes:
+                raise ValueError(
+                    f"Invalid JOSM Validation errors XML: {analyser_name} error {error_number} "
+                    f"references unknown class {class_id or 'UNKNOWN'}"
+                )
+            error_class = classes[class_id]
+            severity = error_class["severity"]
+            class_title = error_class["class_title"]
 
             location = None
             message = ""
@@ -110,27 +121,39 @@ def parse_josm_validation_xml(path: str | Path) -> list[dict]:
                     message = _text_value(child, "value")
 
             if location is None:
-                # JOSM normally writes a location for every TestError. Do not
-                # fabricate coordinates if a malformed/foreign file omits it.
-                continue
+                raise ValueError(
+                    f"Invalid JOSM Validation errors XML: {analyser_name} error {error_number} "
+                    "is missing a valid location"
+                )
             if not object_ids:
-                # Existing QA Buddy ranking is object-based; an error without
-                # an affected primitive cannot be attributed safely.
-                continue
+                raise ValueError(
+                    f"Invalid JOSM Validation errors XML: {analyser_name} error {error_number} "
+                    "has no affected OSM primitive"
+                )
 
-            findings.append(
-                {
-                    "severity": severity,
-                    "rule": analyser_name,
-                    "rule_detail": class_title,
-                    "message": message,
-                    "object_id": object_ids[0],
-                    "object_ids": object_ids,
-                    "coordinates": location,
-                    "analyser": analyser_name,
-                    "class_id": class_id,
-                }
+            finding = {
+                "severity": severity,
+                "rule": analyser_name,
+                "rule_detail": class_title,
+                "message": message,
+                "object_id": object_ids[0],
+                "object_ids": object_ids,
+                "coordinates": location,
+                "analyser": analyser_name,
+                "class_id": class_id,
+            }
+            finding_key = (
+                severity,
+                analyser_name,
+                class_id,
+                class_title,
+                message,
+                tuple(object_ids),
+                tuple(location),
             )
+            if finding_key not in seen_findings:
+                findings.append(finding)
+                seen_findings.add(finding_key)
 
     return findings
 
@@ -161,3 +184,4 @@ def write_geojson(findings: list[dict], output_path: str | Path) -> Path:
         )
     output.write_text(json.dumps({"type": "FeatureCollection", "features": features}, indent=2), encoding="utf-8")
     return output
+

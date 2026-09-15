@@ -107,6 +107,11 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
     xml_path = Path(validation_xml_path)
     if not xml_path.is_file():
         raise FileNotFoundError(f"JOSM validation XML not found: {xml_path}")
+    metadata_path = os.path.join(work_dir, "run_metadata.json")
+    if not os.path.isfile(metadata_path):
+        raise RuntimeError(
+            "GUI run metadata is missing. Run 'prepare' first and use the same QABOT_WORK_DIR when finalizing."
+        )
 
     findings = c["parse_josm_validation_xml"](xml_path)
     errors_path = os.path.join(work_dir, "qa_errors.geojson")
@@ -115,7 +120,6 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
     summary_path = c["aggregate_errors_to_tasks"](tasks_path, errors_path)
     report_path = os.path.join(work_dir, "report.html")
     map_path = os.path.join(work_dir, "map.html")
-    metadata_path = os.path.join(work_dir, "run_metadata.json")
     c["update_run_metadata"](
         metadata_path,
         validation_status="completed",
@@ -170,3 +174,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

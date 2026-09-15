@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal EnableExtensions
 cd /d "%~dp0"
 title OSM QA Buddy - JOSM GUI Bridge
 
@@ -55,14 +55,23 @@ if errorlevel 1 (
     )
 )
 
+set "OSMIUM="
 where osmium >nul 2>&1
-if errorlevel 1 (
+if not errorlevel 1 set "OSMIUM=osmium"
+if not defined OSMIUM if exist "%CONDA_PREFIX%\Library\bin\osmium.exe" set "OSMIUM=%CONDA_PREFIX%\Library\bin\osmium.exe"
+if not defined OSMIUM if exist "%USERPROFILE%\anaconda3\envs\qabot\Library\bin\osmium.exe" set "OSMIUM=%USERPROFILE%\anaconda3\envs\qabot\Library\bin\osmium.exe"
+if not defined OSMIUM if exist "%USERPROFILE%\miniconda3\envs\qabot\Library\bin\osmium.exe" set "OSMIUM=%USERPROFILE%\miniconda3\envs\qabot\Library\bin\osmium.exe"
+
+if not defined OSMIUM (
     echo.
-    echo ERROR: Osmium was not found on PATH.
-    echo Make sure "osmium --version" works in Command Prompt.
+    echo ERROR: Osmium was not found.
+    echo Make sure "osmium --version" works in Command Prompt,
+    echo or install Osmium in the active Conda environment.
     pause
     goto menu
 )
+
+echo Osmium: %OSMIUM%
 
 echo.
 echo Select the OSM PBF file...
@@ -120,8 +129,11 @@ echo.
 echo In JOSM:
 echo   1. Run Validator: Shift+V
 echo   2. Select the Validation errors layer
+
 echo   3. File -^> Save As
+
 echo   4. Save the validation results as XML
+
 echo.
 echo Then come back here and choose:
 echo   2. FINALIZE the latest QA run

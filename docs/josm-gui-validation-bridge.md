@@ -26,6 +26,9 @@ Task Grid + regional PBF
  QA Buddy XML parser
         |
         v
+ thematic filter
+        |
+        v
  qa_errors.geojson
         |
         v
@@ -42,6 +45,35 @@ The exporter writes `TestError` objects using `ValidatorErrorWriter`. The XML
 contains the error location, severity class, human-readable text, and the
 affected OSM primitives. QA Buddy therefore receives the same findings that
 the normal GUI displayed instead of running a second validator implementation.
+
+## Which JOSM findings are kept
+
+JOSM still runs its normal validator configuration. After the XML export, QA
+Buddy applies a thematic filter so the final QA output focuses on the user's
+requested scope:
+
+- **Building-related findings** — findings affecting an OSM primitive tagged
+  `building=*`, including generic geometry/topology tests and building-specific
+  JOSM/HOT rules.
+- **Highway-related findings** — findings affecting an OSM primitive tagged
+  `highway=*`, including generic geometry/topology tests and highway-specific
+  JOSM rules.
+- **Generic tagging errors** — `TagChecker` findings are always retained, as
+  requested.
+- **Duplicate nodes** — `DuplicateNode` findings are always retained, as
+  requested.
+- **Address validation** — explicitly excluded.
+- Other unrelated feature families are excluded unless they are one of the
+  explicitly retained generic categories above.
+
+For generic JOSM tests, QA Buddy uses the actual affected OSM primitives from
+`sample.osm` rather than guessing from the validator class name. Building
+multipolygon relations are followed through their members. This is important
+for findings such as crossing/self-intersection/overlap checks whose validator
+name does not itself say "building" or "highway".
+
+The filter is deliberately not a replacement for JOSM's rules and does not
+change JOSM's validation logic.
 
 ## Interactive CLI workflow
 
@@ -85,6 +117,19 @@ The final output remains compatible with the existing QA Buddy aggregation:
 - `map.html`
 - `run_metadata.json`
 - `validation_errors.xml`
+
+## About the JOSM validation window
+
+The normal JOSM Validator window remains the authoritative human-review view.
+QA Buddy does **not** disable JOSM tests or alter JOSM's Validator preferences
+for the interactive run. This is intentional: the chosen architecture is to
+let JOSM run its normal validation and apply the building/highway thematic
+filter after the native export.
+
+This means the JOSM window may contain unrelated findings while you review the
+validation results. The **final QA Buddy output** is the filtered building /
+highway-focused result set. Do not treat the JOSM window as already filtered by
+QA Buddy.
 
 ## Important boundary behavior
 

@@ -20,7 +20,7 @@ Task Grid + regional PBF
         |  Validate (Shift+V)
         |  Save Validation errors layer as XML
         v
- validation_errors.xml
+       JOSM XML
         |
         v
  QA Buddy XML parser
@@ -45,17 +45,20 @@ the normal GUI displayed instead of running a second validator implementation.
 
 ## Interactive CLI workflow
 
-Prepare the dataset:
+Prepare the dataset from Command Prompt (`cmd.exe`):
 
-```powershell
-$env:QABOT_WORK_DIR = "C:\path\to\osm-qa-buddy\work\gui-run"
+```cmd
 python gui_pipeline.py prepare "C:\data\region.osm.pbf" "C:\data\task_grid.geojson" "C:\data\qa-result"
 ```
 
 Open the generated `sample.osm` in normal JOSM. Run Validator with `Shift+V`
 with no selection so the whole clipped dataset is checked. Review the findings.
-Then select the **Validation errors** layer and use **Save As** to save a
-`validation_errors.xml` file.
+Then select the **Validation errors** layer and use **Save As** to save the
+validation results as XML.
+
+**The XML filename and folder do not matter.** JOSM can save it anywhere and
+with any `.xml` name. QA Buddy only needs the exact path to the file when you
+finalize the run.
 
 **Open `sample.osm`, not `sample.osm.ready.json`.** The `.ready.json` file is a
 QA Buddy handoff marker containing metadata for the prepared dataset; it is not
@@ -63,9 +66,16 @@ an OSM dataset and should not be opened in JOSM.
 
 Finalize the run:
 
-```powershell
-python gui_pipeline.py finalize "C:\data\task_grid.geojson" "C:\data\qa-result\validation_errors.xml" "C:\data\qa-result"
+```cmd
+python gui_pipeline.py finalize "C:\data\task_grid.geojson" "C:\somewhere\my_josm_results.xml" "C:\data\qa-result"
 ```
+
+The second argument is simply the XML file you selected/saved from JOSM. There
+is no required filename such as `validation_errors.xml`, and the XML does not
+need to be inside the QA Buddy output folder.
+
+QA Buddy copies the supplied XML into the result folder as
+`validation_errors.xml` so the final result has a consistent filename.
 
 The final output remains compatible with the existing QA Buddy aggregation:
 

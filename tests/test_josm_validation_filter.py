@@ -1,14 +1,19 @@
+import tempfile
 import unittest
+from pathlib import Path
 
-from josm_validation_filter import filter_josm_findings, is_target_josm_finding
+from josm_validation_filter import filter_josm_findings, is_target_josm_finding, load_osm_feature_tags
 
 
-def finding(analyser, title, message=""):
+def finding(analyser, title, message="", object_ids=None):
+    object_ids = object_ids or ["way/1"]
     return {
         "analyser": analyser,
         "rule": analyser,
         "rule_detail": title,
         "message": message,
+        "object_id": object_ids[0],
+        "object_ids": object_ids,
     }
 
 
@@ -21,6 +26,31 @@ class JosmValidationFilterTests(unittest.TestCase):
     def test_keeps_highway_findings(self):
         self.assertTrue(is_target_josm_finding(finding("CrossingWays", "Crossing highway", "Highway crosses another way")))
         self.assertTrue(is_target_josm_finding(finding("MapCSSTagChecker", "Highway validation", "Road has a tagging problem")))
+
+    def test_uses_affected_object_tags_for_generic_geometry_rules(self):
+        osm = """<osm version='0.6'>
+          <way id='10'><tag k='highway' v='residential'/></way>
+          <way id='20'><tag k='waterway' v='stream'/></way>
+          <way id='30'><tag k='building' v='yes'/></way>
+        </osm>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.osm"
+            path.write_text(osm, encoding="utf-8")
+            tags, members = load_osm_feature_tags(path)
+            self.assertTrue(is_target_josm_finding(finding("CrossingWays", "Crossing ways", "Ways cross", ["way/10"]), tags, members))
+            self.assertFalse(is_target_josm_finding(finding("CrossingWays", "Crossing ways", "Ways cross", ["way/20"]), tags, members))
+            self.assertTrue(is_target_josm_finding(finding("SelfIntersectingWay", "Self-intersecting way", "Geometry problem", ["way/30"]), tags, members))
+
+    def test_relation_members_can_identify_building(self):
+        osm = """<osm version='0.6'>
+          <way id='30'><tag k='building' v='yes'/></way>
+          <relation id='40'><member type='way' ref='30' role='outer'/><tag k='type' v='multipolygon'/></relation>
+        </osm>"""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sample.osm"
+            path.write_text(osm, encoding="utf-8")
+            tags, members = load_osm_feature_tags(path)
+            self.assertTrue(is_target_josm_finding(finding("SelfIntersectingWay", "Geometry problem", "Geometry problem", ["relation/40"]), tags, members))
 
     def test_keeps_requested_generic_rules(self):
         self.assertTrue(is_target_josm_finding(finding("TagChecker", "Missing tag")))

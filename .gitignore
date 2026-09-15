@@ -5,3 +5,5 @@ venv/
 tools/*.jar
 work/
 osm_qa_buddy_results/
+gui_runs/
+.gui_session.txt

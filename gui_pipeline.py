@@ -61,7 +61,7 @@ def prepare_gui_run(pbf_path, tasks_path, output_dir, project_id=None):
         pbf_path,
         metadata_path,
         run_started_utc,
-        ram_gb=0,
+        ram_gb=None,
         project_id=project_id,
     )
     c["update_run_metadata"](
@@ -102,6 +102,8 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
     c = _load_components()
     work_dir = c["WORK_DIR"]
     os.makedirs(work_dir, exist_ok=True)
+    output_dir = os.path.abspath(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
     xml_path = Path(validation_xml_path)
     if not xml_path.is_file():
         raise FileNotFoundError(f"JOSM validation XML not found: {xml_path}")
@@ -136,9 +138,12 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
         "run_metadata.json",
     ):
         src = os.path.join(work_dir, name)
-        if os.path.exists(src):
-            shutil.copy2(src, os.path.join(output_dir, name))
-    shutil.copy2(xml_path, os.path.join(output_dir, "validation_errors.xml"))
+        destination = os.path.join(output_dir, name)
+        if os.path.exists(src) and os.path.abspath(src) != os.path.abspath(destination):
+            shutil.copy2(src, destination)
+    destination_xml = os.path.join(output_dir, "validation_errors.xml")
+    if xml_path.resolve() != Path(destination_xml).resolve():
+        shutil.copy2(xml_path, destination_xml)
 
     print(f"[+] JOSM FINDINGS: {len(findings)}")
     print(f"[+] SUMMARY: {summary_path}")

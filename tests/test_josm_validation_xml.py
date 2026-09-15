@@ -45,7 +45,8 @@ class JosmValidationXmlTests(unittest.TestCase):
 
         self.assertEqual(len(findings), 2)
         self.assertEqual(findings[0]["severity"], "ERROR")
-        self.assertEqual(findings[0]["rule"], "Crossing ways")
+        self.assertEqual(findings[0]["rule"], "CrossingWays")
+        self.assertEqual(findings[0]["rule_detail"], "Crossing ways")
         self.assertEqual(findings[0]["message"], "Ways cross")
         self.assertEqual(findings[0]["coordinates"], [106.8, -6.2])
         self.assertEqual(findings[0]["object_id"], "node/100")
@@ -65,6 +66,7 @@ class JosmValidationXmlTests(unittest.TestCase):
         self.assertIn('"FeatureCollection"', text)
         self.assertIn('"object_ids"', text)
         self.assertIn('"severity": "ERROR"', text)
+        self.assertIn('"rule_detail": "Crossing ways"', text)
 
     def test_rejects_non_josm_root(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -25,7 +25,8 @@ class JosmValidationFilterTests(unittest.TestCase):
 
     def test_keeps_highway_findings(self):
         self.assertTrue(is_target_josm_finding(finding("CrossingWays", "Crossing highway", "Highway crosses another way")))
-        self.assertTrue(is_target_josm_finding(finding("MapCSSTagChecker", "Highway validation", "Road has a tagging problem")))
+        self.assertTrue(is_target_josm_finding(finding("Highways", "Highway validation", "Highway has a problem")))
+        self.assertTrue(is_target_josm_finding(finding("SharpAngles", "Sharp angles on roads", "Sharp angle")))
 
     def test_uses_affected_object_tags_for_generic_geometry_rules(self):
         osm = """<osm version='0.6'>
@@ -55,13 +56,19 @@ class JosmValidationFilterTests(unittest.TestCase):
     def test_keeps_requested_generic_rules(self):
         self.assertTrue(is_target_josm_finding(finding("TagChecker", "Missing tag")))
         self.assertTrue(is_target_josm_finding(finding("DuplicateNode", "Duplicate nodes")))
+        self.assertTrue(is_target_josm_finding(finding("TagChecker", "Address tagging issue", "addr:street missing")))
 
-    def test_excludes_address_even_when_building_is_mentioned(self):
-        self.assertFalse(is_target_josm_finding(finding("Addresses", "Building address problem", "Address is incomplete")))
+    def test_excludes_address_rule(self):
+        self.assertFalse(is_target_josm_finding(finding("Addresses", "House number without street", "Address is incomplete")))
+        self.assertFalse(is_target_josm_finding(finding("MapCSSTagChecker", "Address rule", "Address is incomplete", ["way/1"])))
 
     def test_excludes_unrelated_feature_rules(self):
         self.assertFalse(is_target_josm_finding(finding("CrossingWays", "Crossing waterways", "Waterway crosses another way")))
         self.assertFalse(is_target_josm_finding(finding("PowerLines", "Power line crossing", "Power line problem")))
+
+    def test_ambiguous_words_do_not_keep_unrelated_rules_without_tags(self):
+        self.assertFalse(is_target_josm_finding(finding("SomeTest", "Street geometry problem")))
+        self.assertFalse(is_target_josm_finding(finding("SomeTest", "Path geometry problem")))
 
     def test_filter_reports_removed_count(self):
         findings = [

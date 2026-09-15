@@ -34,7 +34,12 @@ class GuiPipelineTests(unittest.TestCase):
                     "properties": {"taskId": 1, "taskStatus": "VALIDATED"},
                 }],
             }), encoding="utf-8")
-            (work_dir / "sample.osm").write_text("<osm version='0.6'/>", encoding="utf-8")
+            # The XML finding is a generic CrossingWays test. The prepared
+            # object must be a highway so the thematic filter keeps it.
+            (work_dir / "sample.osm").write_text(
+                "<osm version='0.6'><way id='200'><tag k='highway' v='residential'/></way></osm>",
+                encoding="utf-8",
+            )
             (work_dir / "run_metadata.json").write_text(json.dumps({
                 "validation_engine": "JOSM GUI Validator + native Validation errors XML export",
                 "human_review_required": True,
@@ -88,4 +93,3 @@ class GuiPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

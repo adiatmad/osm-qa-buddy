@@ -2,61 +2,68 @@
 
 ## Goal
 
-Define the smallest practical interoperability boundary between OSM QA Buddy and the BetterWorkspace JOSM plugin without coupling QA Buddy to BetterWorkspace's private implementation.
+Provide the smallest practical interoperability path between OSM QA Buddy and the BetterWorkspace JOSM plugin without coupling QA Buddy to BetterWorkspace's private implementation.
 
 QA Buddy remains the QA analysis/orchestration layer. JOSM remains the validation engine. BetterWorkspace remains an optional JOSM-side review/navigation layer. A human mapper remains the final decision-maker.
 
-## Evidence
+## Confirmed boundary
 
-Current repository evidence shows that QA Buddy's JOSM GUI Validation Bridge can preserve affected OSM primitives and task attribution in its existing outputs.
+The first milestone uses a plain OSM XML review-candidate layer as the handoff boundary:
 
-Current BetterWorkspace evidence shows that its multi-validation workflow hands selected JOSM Way primitives to the JOSM Todo plugin. Its current TodoBridge reaches the Todo plugin through reflection and private fields/methods, so those implementation details are not a suitable external contract for QA Buddy.
+1. QA Buddy exports candidate **ways** from an existing JOSM dataset into a separate OSM layer.
+2. The candidate layer contains the original OSM way and its referenced nodes, without QA Buddy tags or other edits to the objects.
+3. A sidecar JSON manifest carries QA provenance, finding details, and optional HOT Tasking Manager task IDs.
+4. The candidate layer is opened in JOSM.
+5. BetterWorkspace's existing multi-validation workflow can operate on the candidate Way layer and hand the ways to the JOSM Todo workflow.
+6. Human review in JOSM remains authoritative.
 
-Therefore, this specification does not assume that QA Buddy can directly write to BetterWorkspace or the Todo plugin.
+This boundary does not require QA Buddy to call BetterWorkspace, Todo plugin internals, reflection targets, or private APIs.
 
 ## Requirements
 
 ### R1 — Review-candidate semantics
 
-Any interoperability output must represent **review candidates**, not authoritative mapping errors or decisions.
+The exported OSM layer represents **review candidates**, not authoritative mapping errors or decisions.
 
-Each candidate should preserve, where available:
+Each manifest candidate preserves, where available:
 
-- OSM primitive identifier(s);
+- OSM primitive identifier;
 - finding source/type;
 - HOT Tasking Manager task identifier;
-- location sufficient for review;
+- finding location;
 - human-readable reason;
-- provenance linking the candidate to the QA Buddy run/finding;
-- optional review-priority metadata only when its semantics are explicitly defined.
+- provenance linking the candidate to the QA Buddy finding;
+- severity as source metadata, not as an automatic review decision.
 
-### R2 — No private-plugin coupling
+### R2 — Way-first interoperability
+
+The first milestone exports only OSM ways because BetterWorkspace's existing multi-validation workflow operates on JOSM Way primitives.
+
+Node-only and relation-only findings remain in the normal QA Buddy outputs and are not silently discarded from QA Buddy itself.
+
+### R3 — No private-plugin coupling
 
 QA Buddy must not depend on BetterWorkspace private classes, fields, methods, reflection targets, package internals, or Todo plugin internals.
 
-The interface must remain usable if BetterWorkspace changes its internal implementation while preserving the documented external behavior.
+### R4 — Unmodified OSM candidates
 
-### R3 — No invented transport
+The exported OSM objects must be copied from the source dataset without injecting QA Buddy tags or changing mapping content. QA metadata belongs in the sidecar manifest.
 
-Do not commit to GeoJSON, JSON, JOSM selection state, plugin API, clipboard automation, Remote Control, or another transport merely because it is convenient.
+### R5 — Preserve existing QA Buddy behavior
 
-The first implementation may begin only after a practical input boundary is confirmed with the BetterWorkspace maintainer or documented by the plugin.
+The existing JOSM GUI Validation Bridge, task attribution, reports, maps, and headless validation behavior remain unchanged.
 
-### R4 — Preserve existing QA Buddy behavior
+### R6 — Human review remains authoritative
 
-The existing JOSM GUI Validation Bridge, task attribution, reports, maps, and headless validation behavior must remain unchanged unless a later accepted specification explicitly changes them.
-
-### R5 — Human review remains authoritative
-
-Interoperability must support navigation and review. It must not automatically resolve, suppress, rank as truth, modify, or upload OSM data.
-
-### R6 — Minimal dependency footprint
-
-The first implementation must not require a new service, hosted integration, or mandatory BetterWorkspace installation unless a later specification demonstrates that such a dependency is necessary.
+The interoperability path supports navigation and review. It must not automatically resolve, suppress, modify, or upload OSM data.
 
 ### R7 — Reproducible provenance
 
-An exported review candidate must be traceable to the QA Buddy run and source finding so that a reviewer can understand why the object was surfaced.
+The sidecar manifest must identify the source findings and candidate OSM objects and retain enough finding information for a reviewer to understand why each object was surfaced.
+
+### R8 — Minimal dependency footprint
+
+The export path uses the repository's existing Python runtime and Shapely dependency. No BetterWorkspace runtime dependency or hosted service is introduced.
 
 ## Non-Goals
 
@@ -66,32 +73,40 @@ An exported review candidate must be traceable to the QA Buddy run and source fi
 - Replacing JOSM validation.
 - Building a new JOSM workspace/plugin inside QA Buddy.
 - Adding AI-based QA decisions or opaque scoring.
-- Replacing existing QA Buddy output formats without evidence that the change is required.
+- Replacing existing QA Buddy output formats.
 - Supporting every JOSM/Todo/BetterWorkspace version in the first milestone.
+- Exporting node-only or relation-only candidates into the BetterWorkspace layer in the first milestone.
 
 ## Acceptance Criteria
 
-The specification is ready for implementation only when all of the following are true:
+1. QA Buddy can export a plain OSM candidate layer containing only candidate ways and their referenced nodes.
+2. Candidate OSM objects are copied without QA-specific tags or mapping changes.
+3. A sidecar manifest records candidate object IDs, finding details, provenance, and task IDs when recoverable.
+4. The export does not import or depend on BetterWorkspace/Todo private implementation details.
+5. Existing QA Buddy findings and task attribution outputs remain available unchanged.
+6. Focused regression tests cover candidate extraction, referenced-node retention, and task attribution.
+7. A Windows/JOSM manual path is documented.
+8. Human review remains required.
 
-1. A documented, practical input boundary for review candidates is confirmed.
-2. The boundary does not require BetterWorkspace private implementation details.
-3. The smallest candidate payload needed for that boundary is documented.
-4. A round-trip or end-to-end manual test path is identified on Windows/JOSM.
-5. Existing QA Buddy behavior has regression coverage for any changed code.
-6. The implementation can remain optional and human-reviewed.
+## Manual acceptance path
 
-## Open Questions
+On Windows:
 
-1. What is the smallest supported mechanism by which BetterWorkspace/JOSM can consume externally produced review candidates?
-2. Does the BetterWorkspace maintainer want a stable external contract, or should interoperability target a lower-level JOSM/Todo mechanism?
-3. Which candidate fields are actually required for the first review workflow?
-4. Is task identity already recoverable from the JOSM data/session, making explicit task IDs unnecessary for the handoff?
-5. Should review priority be omitted initially to avoid inventing semantics?
+1. Run the normal GUI validation workflow through finalization.
+2. Export the BetterWorkspace candidate layer from qa_errors.geojson and the prepared sample.osm.
+3. Open the candidate OSM file as a separate layer in JOSM.
+4. Use BetterWorkspace's existing multi-validation preparation workflow on the candidate layer.
+5. Confirm the candidate ways appear in the JOSM Todo workflow.
+6. Review the candidates manually; do not treat the manifest or candidate list as an automatic mapping decision.
 
-## Decision Gate
+## Implementation notes
 
-**No implementation is authorized by this specification until the input boundary is confirmed.**
+The first implementation lives in betterworkspace_export.py and is intentionally a standalone producer. It can be used from the command line without requiring BetterWorkspace to be installed.
 
-If the maintainer confirms a boundary, update this specification and create the corresponding implementation plan/tasks before coding.
+The sidecar manifest is versioned as:
 
-AI-assisted specification; human maintainer review and merge authority remain required.
+osm-qa-buddy/betterworkspace-review-candidates/v1
+
+The export fails rather than producing a misleading empty handoff when candidate ways cannot be found in the source OSM dataset.
+
+AI-assisted implementation; human maintainer review and merge authority remain required.

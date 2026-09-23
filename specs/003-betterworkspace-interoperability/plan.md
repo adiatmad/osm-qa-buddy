@@ -1,30 +1,35 @@
 # Plan: BetterWorkspace Review Interoperability
 
-## Phase 1 — Evidence and boundary confirmation
+## Phase 1 — Boundary confirmation
 
-1. Keep the current BetterWorkspace evidence recorded in the specification.
-2. Contact the BetterWorkspace maintainer through an available public project channel.
-3. Ask only for the smallest supported input boundary for externally generated review candidates.
-4. Record the maintainer's answer and any version/platform constraints.
+1. Confirm the agreed OSM-layer handoff with the BetterWorkspace maintainer.
+2. Preserve the boundary as a plain JOSM-compatible OSM layer rather than a BetterWorkspace API dependency.
+3. Keep QA metadata outside the OSM objects in a provenance manifest.
 
 ## Phase 2 — Contract definition
 
-1. Define only the fields required by the confirmed boundary.
-2. Separate required fields from optional metadata.
-3. Define provenance and failure behavior.
-4. Explicitly document that candidates are review aids, not authoritative errors.
+1. Define candidate semantics as review aids.
+2. Export ways and their referenced nodes only for the first milestone.
+3. Keep finding/task metadata in a versioned sidecar manifest.
+4. Treat task IDs as optional because not every finding has a recoverable task association.
+5. Omit review-priority automation from the handoff.
 
-## Phase 3 — Implementation planning
+## Phase 3 — Implementation
 
-1. Identify the smallest QA Buddy component that can produce the contract.
-2. Reuse existing finding/task attribution data where possible.
-3. Add focused tests for serialization/normalization and provenance.
-4. Avoid new runtime dependencies unless the confirmed boundary requires one.
-5. Define a Windows/JOSM manual acceptance path.
+1. Add a small standalone exporter that reads existing QA findings and the prepared OSM dataset.
+2. Copy candidate ways and referenced nodes without changing their tags.
+3. Generate the sidecar manifest with finding provenance and task IDs where available.
+4. Add focused regression tests.
+5. Document the Windows/JOSM/BetterWorkspace manual path.
 
 ## Phase 4 — Convergence
 
-1. Compare implementation against the accepted specification and tasks.
-2. Run focused tests and the existing repository test suite.
-3. Perform the manual JOSM acceptance step when applicable.
-4. Review the diff for speculative abstractions, duplicated logic, unrelated cleanup, and hidden coupling.
+1. Compare the implementation against spec.md and tasks.md.
+2. Run the focused exporter tests and the existing repository test suite.
+3. Inspect the complete diff for speculative abstractions, duplicated logic, unrelated cleanup, and hidden BetterWorkspace coupling.
+4. Perform the Windows/JOSM manual acceptance step when the local toolchain is available.
+5. Keep human review and merge authority with the repository owner.
+
+## Known limitation
+
+The GitHub integration cannot perform the Windows/JOSM desktop acceptance step. That remains a local/manual verification item.

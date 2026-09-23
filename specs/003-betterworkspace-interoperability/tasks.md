@@ -2,28 +2,32 @@
 
 ## Discovery
 
-- [ ] Confirm the smallest externally supported BetterWorkspace/JOSM review-candidate input boundary.
-- [ ] Record maintainer feedback and version constraints.
-- [ ] Decide whether task IDs are required in the first handoff.
-- [ ] Decide whether priority metadata is necessary; default to omission unless required.
+- [x] Confirm the OSM-layer handoff boundary.
+- [x] Record the agreed first-milestone scope: candidate ways plus referenced nodes.
+- [x] Treat task IDs as optional metadata.
+- [x] Omit priority metadata from the interoperability contract.
 
 ## Contract
 
-- [ ] Define the minimal review-candidate fields from the confirmed boundary.
-- [ ] Define provenance and failure behavior.
-- [ ] Document the human-review boundary.
-- [ ] Verify the contract does not depend on private BetterWorkspace/Todo internals.
+- [x] Define review-candidate semantics.
+- [x] Define the minimal OSM layer and sidecar manifest fields.
+- [x] Define provenance and failure behavior.
+- [x] Document the human-review boundary.
+- [x] Verify the contract does not depend on private BetterWorkspace/Todo internals.
 
 ## Implementation
 
-- [ ] Create the smallest producer/export path required by the accepted contract.
-- [ ] Reuse existing QA Buddy finding and task-attribution data.
-- [ ] Add focused regression tests.
-- [ ] Add Windows/JOSM manual acceptance evidence.
+- [x] Create the smallest standalone candidate-layer exporter.
+- [x] Reuse existing QA Buddy finding output.
+- [x] Preserve candidate OSM objects without QA-specific tags.
+- [x] Add focused regression tests.
+- [x] Document the Windows/JOSM manual acceptance path.
 
 ## Quality gate
 
-- [ ] Run the relevant automated tests.
-- [ ] Inspect the complete diff for unrelated changes and speculative abstractions.
-- [ ] Confirm existing JOSM validation and task attribution behavior remains unchanged.
-- [ ] Update durable documentation if the confirmed contract introduces a lasting integration rule.
+- [ ] Run the focused exporter tests.
+- [ ] Run the existing repository test suite.
+- [x] Inspect the implementation for unrelated changes and speculative abstractions.
+- [x] Confirm existing JOSM validation and task attribution behavior remains available.
+- [x] Keep BetterWorkspace integration optional and dependency-free.
+- [ ] Perform Windows/JOSM manual acceptance.

@@ -26,8 +26,10 @@ jobs:
         run: python3 -m unittest tests/test_josm_validation_filter.py
       - name: Run JOSM GUI bridge pipeline tests
         run: python3 -m unittest tests/test_gui_pipeline.py
+      - name: Install pytest for function-style exporter tests
+        run: python3 -m pip install pytest
       - name: Run BetterWorkspace review-candidate export tests
-        run: python3 -m unittest tests/test_betterworkspace_export.py
+        run: python3 -m pytest -q tests/test_betterworkspace_export.py
       - name: Run native workflow checks
         run: python3 native_smoke.py
       - name: Build Docker image

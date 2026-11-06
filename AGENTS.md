@@ -66,8 +66,17 @@ AI may investigate, implement, test, commit, and open a PR. Human review and mer
 
 ## Anti-Slop quality gate
 
-Use Anti-Slop as a filter, not an architecture authority. Reject unnecessary boilerplate, speculative abstractions, duplicated logic, decorative comments, generic AI-sounding copy, and unrelated cleanup. Every significant addition should have a demonstrated purpose. For changed comments, follow `.gemini/skills/antislop-code/SKILL.md`.
+Use Anti-Slop as a filter, not an architecture authority. Reject unnecessary boilerplate, speculative abstractions, duplicated logic, decorative comments, generic AI-sounding copy, and unrelated cleanup. Every significant addition should have a demonstrated purpose. For all changed code and comments, follow the repository-root `antislop.md` core rules. Do not rely on an agent-specific skill path that may not be installed.
 
 ## Evidence contract
 
 Never claim a check passed unless it actually ran. If a check could not be performed, say exactly what remains unverified. A feature is complete when the evidence supports the acceptance criteria, not merely when the code compiles.
+
+
+## Additional engineering skills
+
+- Use the composable Matt Pocock engineering skills when appropriate: TDD, diagnosing-bugs, codebase-design, and two-axis code review. Source: https://github.com/mattpocock/skills
+- The full Anti-Slop rulebook is vendored at `/antislop.md`; apply it as a quality filter, not as an architecture authority.
+- Keep the existing Spec Kit workflow and constitution authoritative. Do not duplicate the current specification/task artifacts.
+- UI/UX Pro Max is not installed by default because this repository's primary workflow is a JOSM-assisted QA pipeline rather than a product UI. Reassess only if a first-party user interface becomes a substantial product surface.
+- Model multi-step work as a dependency graph; parallelise only independent tasks, preserve human QA decisions, and keep verification checkpoints explicit.

@@ -71,3 +71,17 @@ Use Anti-Slop as a filter, not an architecture authority. Reject unnecessary boi
 ## Evidence contract
 
 Never claim a check passed unless it actually ran. If a check could not be performed, say exactly what remains unverified. A feature is complete when the evidence supports the acceptance criteria, not merely when the code compiles.
+
+
+## Ponytail minimal-change discipline
+
+Apply Ponytail's smallest-complete-change rule alongside this repository's existing workflow; it does not replace or weaken the repository-specific requirements above.
+
+- Read the affected code and trace callers, tests, fixtures, configuration, and exports before editing.
+- Prefer existing project helpers and patterns, then standard-library or native platform features, then already-installed dependencies. Add no abstraction, dependency, option, or configuration without a demonstrated need.
+- Make the smallest complete change, not merely the smallest diff: preserve required validation, security, accessibility, error handling, and data-loss protections.
+- Add a focused test or assert-based self-check for new non-trivial logic and bug fixes. Never weaken a valid test to make a change pass.
+- Review the complete diff and verify the relevant behavior. Report what was not checked and any remaining risk.
+- Mark deliberate shortcuts as `shortcut: <the limit>, <when to upgrade>`.
+
+Use the full Ponytail Skill at `.agents/skills/ponytail/SKILL.md` when the active agent supports project Skills. Existing Spec Kit, Anti-Slop, Superpowers/Loop & Graph, and repository-specific rules remain in force.

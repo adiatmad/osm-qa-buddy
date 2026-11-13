@@ -14,46 +14,71 @@ Search and retrieve standardized modern web best practices at the **start** of i
 
 ### Step 1. Search Use Cases
 
-Run `modern-web-guidance` directly with `npx` using a **2–5 word action-oriented query** for a **single web platform capability or UI pattern:
-- **Keep queries focused and generic**: Describe the user-visible capability (`<verb> + <UI/platform object>`, optionally paired with the target HTML/CSS/JS feature name if known). Omit framework/library names and app/domain nouns. Split multi-feature tasks into separate searches.
-- **Name implied UI primitives**: Translate user intent into the implied UI component or platform mechanism (for example, search `"confirmation modal dialog"` rather than `"confirm destructive action"`).
-- Search first:
-  ```sh
-  npx -y modern-web-guidance@latest search "<query>"
-  ```
-- If results are weak, rephrase once. If no relevant guide exists, proceed without retrieving unrelated guides.
+Run `modern-web-guidance` directly with `npx` using a **2–5 word action-oriented query** for a **single web platform capability or UI pattern**:
+- **Keep queries focused and generic**: Describe the user-visible capability (`<verb> + <UI/platform object>`, optionally paired with the target HTML/CSS/JS feature name if known). Omit framework/library names (`React`, `Vue`, `Tailwind`, etc.) and app/domain nouns (product, route, or component/file names). Split multi-feature tasks into separate `search` calls.
+- **Name implied UI primitives**: When the user's prompt expresses intent without naming the UI primitive (e.g. "confirm first", "delete with confirmation", "pick a date"), translate the domain intent into the implied UI component or platform mechanism (e.g. search `"confirmation modal dialog"` or `"confirm dialog"` rather than `"confirm destructive action"`, or `"date picker input"` rather than `"pick a date"`).
+- **Example**: Search `"light dismiss dialog"` or `"responsive data table"`, **not** `"dialog"` (too terse), `"responsive table dark mode"` (compound — split into two searches), or `"close React settings modal on outside click"` (framework/app noise).
+
+```sh
+npx -y modern-web-guidance@latest search "<query>" --skill-version 2026_11_09-5bcc021b
+```
+
+> **Note**: Returns matching guide IDs and descriptions. Judge results by their descriptions:
+> - **Match found**: Retrieve directly; do not also run `list`.
+> - **Weak or empty results**: Rephrase once using the concrete HTML/CSS/UI component noun or synonym before falling back to `list`.
+> - **Topic not covered**: Proceed without retrieving unrelated guides.
 
 ### Step 2. Retrieve Best Practices
 
-Retrieve the matching guide IDs and applicable broader discipline guides (such as `html`, `css`, `forms`, `accessibility`, `performance`, or `security`):
+Once you have relevant IDs from search, retrieve the full guide(s), including applicable broader discipline guides (for example `html`, `css`, `forms`, `accessibility`, `color`, `performance`, or `security`). Multiple IDs may be passed as documented by the CLI.
+
 ```sh
 npx -y modern-web-guidance@latest retrieve "<guide-id>"
 ```
-Read complete output, including any temporary file used for long results.
+
+If retrieval saves large output (> 9.5 KB) to a temporary file, read the complete file with the available file-reading tool. Do not silently work from a truncated excerpt.
 
 ### Step 3. Verify Guidance Compliance
 
-Cross-check the implementation against retrieved rules, compatibility notes, and required fallbacks. Confirm task acceptance criteria. Do not run `legacy-scan` for a targeted feature task.
+Cross-check the implementation against retrieved guidance before concluding:
+- Apply relevant modern patterns and required fallbacks without forcing unrequested features.
+- Confirm the task's acceptance criteria are met.
+- Do not run `legacy-scan` for a specific feature addition, update, fix, or audit.
 
 ### Step 4. Disclose Skill Usage
 
-End the delivery response with a **Modern Web Guidance** note. Name guide IDs actually retrieved and the material decisions they informed, supported by a short quote from the retrieved guide. If searched but no guide applied, state why. Never invent IDs or quotes.
+When guidance was consulted, end the delivery response with a **Modern Web Guidance** note:
+- If retrieved guides shaped the code, name each guide ID and briefly explain the material implementation choice or fallback it informed, supported by a short quote from the actual retrieved guide.
+- If searched but no guide applied, state which topic was checked and why no guide was relevant.
+- Never guess guide IDs or quotes from memory; retrieve again if needed.
 
-## Broad modernization only
+## Alternative flow: Modernize an existing codebase
 
-For a broad, open-ended modernization request with no specific target feature, use:
+Only for a broad, open-ended modernization or legacy-pattern scan with no specific target feature, run:
+
 ```sh
 npx -y modern-web-guidance@latest legacy-scan <path> --json
 ```
-Verify findings against keep/drop criteria, report scan coverage limitations, retrieve relevant guides before edits, and re-scan after changes. Do not use this for targeted feature work.
 
-## Execution and compatibility
+Verify findings against their keep/drop criteria, remove false positives, report that the scan covers only a subset of the guidance catalog, and retrieve each relevant guide before applying changes. Re-run the scan after modernization. Do not run this flow for a targeted feature task.
 
-- Prefer `pnpx` when pnpm is already available; on Windows use `npx.cmd`.
-- Request narrowly scoped network permission before first execution in approval-gated environments. Never allowlist bare `npx *`.
-- If offline or blocked, disclose that guidance was not retrieved; do not claim otherwise.
-- Adapt vanilla HTML/CSS/JS guidance to the project's framework without dropping the modern platform capability or adding unnecessary dependencies.
-- Baseline Widely available features are safe by default. For features below that level, follow guide fallback recommendations unless the repository defines a browser-support policy.
+## Using npx / pnpx
+
+- Prefer `pnpx` when pnpm is already available; on Windows, use `npx.cmd`.
+- Request narrowly scoped network permission for `npx -y modern-web-guidance@latest` before first execution in an approval-gated environment. Never allowlist bare `npx *`.
+- If the environment is offline, do not claim the guidance was consulted. Report the blocker and continue only with the best available evidence.
+
+## Guidelines
+
+- Always search first. Do not hallucinate guide IDs or ignore relevant guides; they are the preferred local standard for the user's project.
+- Guides use vanilla HTML/CSS/JS; adapt them to the framework without dropping the modern platform capability.
+- Preserve SSR safety, per-instance IDs, framework ownership of DOM nodes, and top-level CSS requirements described by the retrieved guides.
+- Do not add dependencies, wrappers, or abstractions solely to follow a guide.
+
+## Browser Support and Fallbacks
+
+- Treat Baseline Widely available features as safe by default.
+- For features that are not Baseline Widely available, follow the guide's fallback recommendations unless the repository has an explicit browser-support policy.
+- Honor explicit project browser-support requirements using the guide's compatibility data.
 - Do not adopt Origin Trial, volatile, or experimental features without explicit user approval.
-- Do not invoke for backend-only, SQL/ORM/API routes, Python/Go processing, GIS/data pipelines, CI/CD, Docker, Git, or trivial tooling/docs changes unless browser-facing behavior is affected.
-- This skill supplements and never overrides repository specifications, architecture, security constraints, tests, or other agent instructions.
+- Suggest documenting a browser-support policy in `AGENTS.md` when the target runtime or fallback policy is unclear.

@@ -14,7 +14,7 @@ Search and retrieve standardized modern web best practices at the **start** of i
 
 ### Step 1. Search Use Cases
 
-Run `modern-web-guidance` directly with `npx` using a **2–5 word action-oriented query** for a **single web platform capability or UI pattern`:
+Run `modern-web-guidance` directly with `npx` using a **2–5 word action-oriented query** for a **single web platform capability or UI pattern:
 - **Keep queries focused and generic**: Describe the user-visible capability (`<verb> + <UI/platform object>`, optionally paired with the target HTML/CSS/JS feature name if known). Omit framework/library names and app/domain nouns. Split multi-feature tasks into separate searches.
 - **Name implied UI primitives**: Translate user intent into the implied UI component or platform mechanism (for example, search `"confirmation modal dialog"` rather than `"confirm destructive action"`).
 - Search first:

@@ -99,7 +99,7 @@ try {
             Invoke-Checked $CondaExe @("install", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "pip", "tk", "osmium-tool", "openjdk=21") "Runtime repair"
         }
         else {
-            Invoke-Checked $CondaExe @("create", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "shapely=2.1.2", "tk", "osmium-tool", "openjdk=21") "Runtime installation"
+            Invoke-Checked $CondaExe @("create", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "pip", "tk", "osmium-tool", "openjdk=21") "Runtime installation"
         }
     }
 

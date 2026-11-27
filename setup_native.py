@@ -1,5 +1,4 @@
 import argparse
-import hashlib
 import shutil
 import subprocess
 import sys
@@ -17,21 +16,11 @@ JOSM_URL = "https://josm.openstreetmap.de/download/josm-tested.jar"
 JYTHON_URL = f"https://repo1.maven.org/maven2/org/python/jython-standalone/{JYTHON_VERSION}/jython-standalone-{JYTHON_VERSION}.jar"
 
 
-def sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def download(url, destination, expected_sha256=None):
+def download(url, destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists() and destination.stat().st_size > 100000:
-        if expected_sha256 is None or sha256(destination) == expected_sha256:
-            print(f"OK: {destination.name} already exists")
-            return
-        destination.unlink()
+        print(f"OK: {destination.name} already exists")
+        return
     print(f"Downloading {destination.name}...")
     try:
         with urllib.request.urlopen(url, timeout=60) as response, open(destination, "wb") as output:
@@ -42,7 +31,6 @@ def download(url, destination, expected_sha256=None):
     if expected_sha256 and sha256(destination) != expected_sha256:
         destination.unlink(missing_ok=True)
         raise RuntimeError(f"SHA-256 verification failed for {destination.name}.")
-
 
 
 def is_valid_josm_jar(path):

@@ -44,7 +44,7 @@ You do **not** need to install Python, Java, Osmium Tool, Conda, or JOSM yoursel
 
 1. Download or clone this repository to a folder you can write to.
 2. Double-click **Launch_OSM_QA_Buddy.vbs**.
-3. On the first launch, a visible setup window downloads and verifies the official Miniforge installer, creates a private Python 3.12 environment, installs Shapely, Osmium Tool and OpenJDK, downloads and verifies the pinned JOSM JAR, then opens the GUI.
+3. On the first launch, a visible setup window downloads and verifies the official Miniforge installer, creates a private Python 3.12 environment, installs Shapely, Osmium Tool and OpenJDK, downloads the official current tested JOSM release and checks that it is a valid application JAR, then opens the GUI.
 4. On later launches, the bootstrap checks the existing runtime, repairs missing dependencies if needed, and opens the GUI.
 
 The runtime is kept in `.qabot-runtime\` inside this checkout. It does not modify your global Python installation or Windows PATH and does not require administrator access. Keep the repository folder in place after setup.

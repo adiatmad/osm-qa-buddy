@@ -38,149 +38,37 @@ Task-level QA results + map + report
 
 ---
 
-## What you need
+## First launch: click the VBS file
 
-This workflow currently targets **Windows**.
+You do **not** need to install Python, Java, Osmium Tool, Conda, or JOSM yourself.
 
-Install these first:
+1. Download or clone this repository to a folder you can write to.
+2. Double-click **Launch_OSM_QA_Buddy.vbs**.
+3. On the first launch, a visible setup window downloads and verifies the official Miniforge installer, creates a private Python 3.12 environment, installs Shapely, Osmium Tool and OpenJDK, downloads and verifies the pinned JOSM JAR, then opens the GUI.
+4. On later launches, the bootstrap checks the existing runtime, repairs missing dependencies if needed, and opens the GUI.
 
-- **Python 3.12+**
-- **Java 64-bit**
-- **Osmium Tool** (the osmium.exe command-line tool; the Python package named osmium is not a substitute)
-- **Git**
-- **JOSM**
+The runtime is kept in `.qabot-runtime\` inside this checkout. It does not modify your global Python installation or Windows PATH and does not require administrator access. Keep the repository folder in place after setup.
 
-You do **not** need Docker.
+**First launch requires an internet connection and several hundred MB of free disk space.** Downloads are verified before installers/components are used. If setup fails, the PowerShell window stays open with the error; correct the issue and click the VBS again.
 
-QA Buddy discovers Osmium on PATH, in the active Conda environment, and in common Miniforge/Conda environments. For a custom installation, set OSMIUM_EXE to the full path of osmium.exe, for example:
-
-```cmd
-setx OSMIUM_EXE "C:/Tools/osmium/osmium.exe"
-```
-
-Reopen QA Buddy after changing the setting.
-
-Check that Windows can find the command-line tools:
-
-```cmd
-python --version
-java -version
-osmium --version
-git --version
-```
-
-If these commands work, you are ready to start.
+You do not need Git after downloading the repository as a ZIP. Git is only needed if you want to clone or update the source.
 
 ---
 
 # Quick start: JOSM GUI Validation Bridge
 
-## 1. Download QA Buddy
+After the GUI opens:
 
-Open Command Prompt (`cmd.exe`) and run:
+1. Choose your **OSM PBF** file.
+2. Choose the **Task Grid GeoJSON** file.
+3. Click **Start QA Run**. QA Buddy prepares `sample.osm`.
+4. Click **Open sample.osm in JOSM**. QA Buddy launches its prepared JOSM runtime directly; no Windows file association is needed.
+5. In JOSM, run Validator with **Shift+V**, review the findings, select the **Validation errors** layer, and use **File → Save As** to save the results as XML.
+6. Return to QA Buddy, open the **Finalize** tab, select the XML file, and click **Finalize QA Run**.
 
-```cmd
-git clone https://github.com/adiatmad/osm-qa-buddy.git
-cd osm-qa-buddy
-```
+QA Buddy then produces the task-level results, map, and report.
 
-If you already cloned it, just enter the folder:
-
-```cmd
-cd C:\path\to\osm-qa-buddy
-```
-
----
-
-## 2. Get your two input files
-
-You need:
-
-1. **OSM PBF** — the regional/country `.osm.pbf` containing the area you want to check.
-2. **Task Grid GeoJSON** — the HOT Tasking Manager task grid for the project.
-
-You do **not** need to rename the files.
-
-For example:
-
-```text
-C:\data\nepal.osm.pbf
-C:\data\tasks_nepal-tasks.geojson
-```
-
-The project boundary is not a separate input for this bridge command; QA Buddy uses the task grid to prepare the run.
-
----
-
-## 3. Prepare the JOSM dataset
-
-Run:
-
-```cmd
-python -u gui_pipeline.py prepare "C:\data\nepal.osm.pbf" "C:\data\tasks_nepal-tasks.geojson" "C:\data\qa-result"
-```
-
-Replace the three paths with your own files/folder.
-
-When it finishes, QA Buddy will tell you where `sample.osm` was created.
-
-### Important
-
-**Open `sample.osm` in JOSM.**
-
-Do **not** open:
-
-```text
-sample.osm.ready.json
-```
-
-The `.ready.json` file is only a small metadata/handoff file. It is not OSM data.
-
----
-
-## 4. Run normal JOSM validation
-
-Open `sample.osm` in **normal JOSM**.
-
-Then:
-
-1. Let JOSM finish loading the data.
-2. Make sure nothing is selected if you want to validate the whole dataset.
-3. Press **Shift+V** to run the JOSM Validator.
-4. Review the validation results.
-5. Select the **Validation errors** layer.
-6. Use **File → Save As**.
-7. Save the validation results as an XML file.
-
-**The XML can have any filename and can be saved in any folder.** For example:
-
-```text
-C:\data\qa-result\my_josm_check.xml
-```
-
-QA Buddy does not depend on the name `validation_errors.xml`, and it does not require the XML to be in the QA Buddy output folder. If the JOSM GUI lets you save it there, that is fine.
-
----
-
-## 5. Give the JOSM results back to QA Buddy
-
-Back in Command Prompt, run:
-
-```cmd
-python -u gui_pipeline.py finalize "C:\data\tasks_nepal-tasks.geojson" "C:\data\qa-result\my_josm_check.xml" "C:\data\qa-result"
-```
-
-Replace the paths with your own.
-
-**The second path is simply the XML file you picked/saved in JOSM.** Its filename and location do not matter; the exact path you provide does.
-
-If everything is OK, you will see:
-
-```text
-[+] GUI PIPELINE SUCCEEDED
-```
-
-Done. 🎉
+The project boundary is not a separate input for this bridge; the Task Grid is the authoritative extraction geometry.
 
 ---
 
@@ -289,19 +177,15 @@ You can also use files you already downloaded locally.
 
 # Troubleshooting
 
-### `python` is not recognized
+### First-run setup fails
 
-Install Python 3.12+ and make sure Python is available on PATH.
+Read the error in the PowerShell window. Check your internet connection, available disk space, and whether security software or a managed network is blocking GitHub or conda-forge downloads. Then click the VBS launcher again; completed downloads and packages are reused.
+
+The private runtime lives in `.qabot-runtime\`. If that folder contains a clearly incomplete Miniforge installation, close QA Buddy, remove only `.qabot-runtime\miniforge\`, and retry. Do not delete the whole repository or your QA run folders.
 
 ### Osmium Tool is not detected
 
-QA Buddy verifies the executable by running osmium.exe --version. Install the Osmium Tool package (osmium-tool) in a Conda environment, or set OSMIUM_EXE to the full path of osmium.exe:
-
-```cmd
-setx OSMIUM_EXE "C:/path/to/osmium.exe"
-```
-
-Close and reopen QA Buddy after changing the setting. If the executable is found but cannot start, restore the complete Osmium distribution, including its DLL files. The Python package named osmium (pyosmium) does not provide the command-line executable.
+The bootstrap installs and verifies the actual `osmium.exe` command-line tool in the private environment. The Python package named `osmium` (pyosmium) is not a replacement.
 
 ### JOSM does not open `sample.osm`
 

@@ -22,9 +22,9 @@ Install Miniforge per-user and create a repository-local Conda environment under
 
 Obtain the official Miniforge Windows x86-64 release asset and verify its GitHub-provided SHA-256 digest before execution. Verify Python/Tkinter/Shapely imports and `osmium.exe --version` before launching the GUI. Fail closed with a visible actionable error.
 
-### R4 — Prepare JOSM for the GUI workflow
+### R4 — Use the installed JOSM
 
-Download the repository-pinned JOSM JAR through the existing checksum-verifying setup code. The GUI must launch that JOSM JAR directly; it must not depend on a separately installed JOSM or Windows file association. The GUI bootstrap must not download the legacy Jython component that is not needed for the GUI bridge.
+Do not download or bundle JOSM or Java for the GUI bridge. Open the prepared `sample.osm` through the Windows `.osm` file association so the user's installed JOSM opens it. If the association is missing, show an actionable error explaining how to associate `.osm` files with JOSM.
 
 ### R5 — Repair and reuse
 

@@ -46,11 +46,19 @@ Install these first:
 
 - **Python 3.12+**
 - **Java 64-bit**
-- **Osmium**
+- **Osmium Tool** (the osmium.exe command-line tool; the Python package named osmium is not a substitute)
 - **Git**
 - **JOSM**
 
 You do **not** need Docker.
+
+QA Buddy discovers Osmium on PATH, in the active Conda environment, and in common Miniforge/Conda environments. For a custom installation, set OSMIUM_EXE to the full path of osmium.exe, for example:
+
+```cmd
+setx OSMIUM_EXE "C:/Tools/osmium/osmium.exe"
+```
+
+Reopen QA Buddy after changing the setting.
 
 Check that Windows can find the command-line tools:
 
@@ -285,9 +293,15 @@ You can also use files you already downloaded locally.
 
 Install Python 3.12+ and make sure Python is available on PATH.
 
-### `osmium` is not recognized
+### Osmium Tool is not detected
 
-Install Osmium and make sure `osmium` works from Command Prompt.
+QA Buddy verifies the executable by running osmium.exe --version. Install the Osmium Tool package (osmium-tool) in a Conda environment, or set OSMIUM_EXE to the full path of osmium.exe:
+
+```cmd
+setx OSMIUM_EXE "C:/path/to/osmium.exe"
+```
+
+Close and reopen QA Buddy after changing the setting. If the executable is found but cannot start, restore the complete Osmium distribution, including its DLL files. The Python package named osmium (pyosmium) does not provide the command-line executable.
 
 ### JOSM does not open `sample.osm`
 

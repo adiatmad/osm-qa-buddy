@@ -55,23 +55,24 @@ if errorlevel 1 (
     )
 )
 
-set "OSMIUM="
-where osmium >nul 2>&1
-if not errorlevel 1 set "OSMIUM=osmium"
-if not defined OSMIUM if exist "%CONDA_PREFIX%\Library\bin\osmium.exe" set "OSMIUM=%CONDA_PREFIX%\Library\bin\osmium.exe"
-if not defined OSMIUM if exist "%USERPROFILE%\anaconda3\envs\qabot\Library\bin\osmium.exe" set "OSMIUM=%USERPROFILE%\anaconda3\envs\qabot\Library\bin\osmium.exe"
-if not defined OSMIUM if exist "%USERPROFILE%\miniconda3\envs\qabot\Library\bin\osmium.exe" set "OSMIUM=%USERPROFILE%\miniconda3\envs\qabot\Library\bin\osmium.exe"
+set "OSMIUM_RESOLVED="
+for /f "delims=" %%I in ('%PYTHON% osmium_tool.py --print-path 2^>nul') do set "OSMIUM_RESOLVED=%%I"
 
-if not defined OSMIUM (
+if not defined OSMIUM_RESOLVED (
     echo.
-    echo ERROR: Osmium was not found.
-    echo Make sure "osmium --version" works in Command Prompt,
-    echo or install Osmium in the active Conda environment.
+    echo ERROR: Osmium Tool could not be found or executed.
+    %PYTHON% osmium_tool.py --print-path
+    echo.
+    echo Install osmium-tool in a Conda environment, add its Library\bin folder to PATH,
+    echo or configure OSMIUM_EXE with the full path to osmium.exe.
     pause
     goto menu
 )
 
-echo Osmium: %OSMIUM%
+set "OSMIUM_EXE=%OSMIUM_RESOLVED%"
+for %%I in ("%OSMIUM_RESOLVED%") do set "OSMIUM_DIR=%%~dpI"
+set "PATH=%OSMIUM_DIR%;%PATH%"
+echo Osmium: %OSMIUM_RESOLVED%
 
 echo.
 echo Select the OSM PBF file...

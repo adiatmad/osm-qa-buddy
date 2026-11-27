@@ -14,6 +14,7 @@ from shapely.geometry import Point, shape
 
 from preflight import normalize_task_grid_for_osmium, validate_inputs
 from report import generate_report
+from osmium_tool import OsmiumToolError, resolve_osmium
 
 QA_BUDDY_VERSION = "0.1.0"
 JOSM_VERSION = "19613"
@@ -59,17 +60,21 @@ def _check_native_toolchain():
     missing = []
     if shutil.which("java") is None:
         missing.append("Java")
-    if shutil.which("osmium") is None:
-        missing.append("Osmium")
+    try:
+        osmium_path = resolve_osmium()
+    except OsmiumToolError as exc:
+        osmium_path = None
+        missing.append(str(exc))
     if not JOSM_JAR.is_file():
         missing.append(f"tools/{JOSM_JAR.name}")
     if not JYTHON_JAR.is_file():
         missing.append(f"tools/{JYTHON_JAR.name}")
     if missing:
-        raise RuntimeError("Native prerequisites missing: " + ", ".join(missing) + ". Run setup_native.py first.")
+        raise RuntimeError("Native prerequisites missing: " + "; ".join(missing) + ". Run setup_native.py after fixing the listed prerequisites.")
+    return osmium_path
 
 
-def write_run_metadata(tasks_path, pbf_path, output_path, run_started_utc, ram_gb, project_id=None, aoi_path=None):
+def write_run_metadata(tasks_path, pbf_path, output_path, run_started_utc, ram_gb, project_id=None, aoi_path=None, osmium_path=None):
     inputs = {}
     for label, path in (("task_grid", tasks_path), ("geofabrik_pbf", pbf_path)):
         stat = os.stat(path)
@@ -89,7 +94,7 @@ def write_run_metadata(tasks_path, pbf_path, output_path, run_started_utc, ram_g
             "josm_tested_version": JOSM_VERSION,
             "jython_version": JYTHON_VERSION,
             "java_runtime": _command_version(["java", "-version"]),
-            "osmium_version": _command_version(["osmium", "--version"]),
+            "osmium_version": _command_version([osmium_path or resolve_osmium(), "--version"]),
         },
         "inputs": inputs,
         "human_review_required": True,
@@ -167,14 +172,16 @@ def prepare_additional_third_pass_rules():
     return prepared, provenance
 
 
-def _osmium_fileinfo(path):
-    result = subprocess.run(["osmium", "fileinfo", "-e", path], capture_output=True, text=True, check=False)
+def _osmium_fileinfo(path, osmium_path=None):
+    osmium_path = osmium_path or resolve_osmium()
+    result = subprocess.run([osmium_path, "fileinfo", "-e", path], capture_output=True, text=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(f"Osmium could not inspect the extracted dataset:\n{result.stderr or result.stdout}")
     return result.stdout or result.stderr
 
 
-def clip_pbf_with_osmium(tasks_geojson_path, regional_pbf_path):
+def clip_pbf_with_osmium(tasks_geojson_path, regional_pbf_path, osmium_path=None):
+    osmium_path = osmium_path or resolve_osmium()
     output_osm_path = os.path.join(WORK_DIR, "sample.osm")
     normalized_tasks_path = os.path.join(WORK_DIR, "osmium_task_grid_union.geojson")
     ready_marker = os.path.join(WORK_DIR, "sample.osm.ready.json")
@@ -182,10 +189,10 @@ def clip_pbf_with_osmium(tasks_geojson_path, regional_pbf_path):
         os.remove(ready_marker)
     normalize_task_grid_for_osmium(tasks_geojson_path, normalized_tasks_path)
     print(f"[*] Clipping PBF ({os.path.basename(regional_pbf_path)}) using the full HOT Task Grid union...")
-    result = subprocess.run(["osmium", "extract", "-p", normalized_tasks_path, regional_pbf_path, "-o", output_osm_path, "--overwrite"], capture_output=True, text=True)
+    result = subprocess.run([osmium_path, "extract", "-p", normalized_tasks_path, regional_pbf_path, "-o", output_osm_path, "--overwrite"], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Osmium extraction failed:\n{result.stderr or result.stdout}")
-    fileinfo = _osmium_fileinfo(output_osm_path)
+    fileinfo = _osmium_fileinfo(output_osm_path, osmium_path)
     print("  -> Extracted Task Grid dataset:")
     print(fileinfo)
     print(f"  -> Saved to {output_osm_path}")
@@ -268,7 +275,7 @@ def run_local_pipeline(pbf_path, tasks_path, output_dir=None, ram_gb=24, project
     os.makedirs(WORK_DIR, exist_ok=True)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-    _check_native_toolchain()
+    osmium_path = _check_native_toolchain()
     run_started_utc = datetime.now(timezone.utc).isoformat()
     print("==================================================\n Starting OSM QA Buddy — 3rd Pass Validation\n==================================================")
     preflight = validate_inputs(tasks_path, pbf_path, check_pbf=True, aoi_path=aoi_path)
@@ -277,14 +284,14 @@ def run_local_pipeline(pbf_path, tasks_path, output_dir=None, ram_gb=24, project
     if not preflight["ok"]:
         raise RuntimeError("Pre-flight validation failed. Fix the selected input files and try again.")
     metadata_path = os.path.join(WORK_DIR, "run_metadata.json")
-    write_run_metadata(tasks_path, pbf_path, metadata_path, run_started_utc, ram_gb, project_id=project_id, aoi_path=aoi_path)
+    write_run_metadata(tasks_path, pbf_path, metadata_path, run_started_utc, ram_gb, project_id=project_id, aoi_path=aoi_path, osmium_path=osmium_path)
     for src, name in ((tasks_path, "project_tasks.geojson"), (pbf_path, "region.osm.pbf")):
         dst = os.path.join(WORK_DIR, name)
         if os.path.abspath(src) != os.path.abspath(dst):
             shutil.copy2(src, dst)
     tasks, pbf = (os.path.join(WORK_DIR, x) for x in ("project_tasks.geojson", "region.osm.pbf"))
-    sample_path = clip_pbf_with_osmium(tasks, pbf)
-    _update_run_metadata(metadata_path, extracted_dataset={"path": sample_path, "size_bytes": os.path.getsize(sample_path), "osmium_fileinfo": _osmium_fileinfo(sample_path)})
+    sample_path = clip_pbf_with_osmium(tasks, pbf, osmium_path=osmium_path)
+    _update_run_metadata(metadata_path, extracted_dataset={"path": sample_path, "size_bytes": os.path.getsize(sample_path), "osmium_fileinfo": _osmium_fileinfo(sample_path, osmium_path)})
     hot_rules_dir = prepare_hot_rules()
     additional_rules, provenance = prepare_additional_third_pass_rules()
     _update_run_metadata(metadata_path, rule_sources={"hot_rules_url": HOT_RULES_URL, "hot_rules_dir": hot_rules_dir, "additional_third_pass_rules": provenance})

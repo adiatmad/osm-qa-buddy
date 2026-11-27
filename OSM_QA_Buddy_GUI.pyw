@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import threading
@@ -18,30 +17,18 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from osmium_tool import OsmiumToolError, resolve_osmium
+
 REPO_DIR = Path(__file__).resolve().parent
 SESSION_FILE = REPO_DIR / ".gui_session.txt"
 RUNS_DIR = REPO_DIR / "gui_runs"
 
 
 def find_osmium() -> str | None:
-    found = shutil.which("osmium")
-    if found:
-        return found
-    candidates = []
-    conda_prefix = os.environ.get("CONDA_PREFIX")
-    if conda_prefix:
-        candidates.append(Path(conda_prefix) / "Library" / "bin" / "osmium.exe")
-    user = Path(os.environ.get("USERPROFILE", str(Path.home())))
-    candidates.extend(
-        [
-            user / "anaconda3" / "envs" / "qabot" / "Library" / "bin" / "osmium.exe",
-            user / "miniconda3" / "envs" / "qabot" / "Library" / "bin" / "osmium.exe",
-        ]
-    )
-    for path in candidates:
-        if path.is_file():
-            return str(path)
-    return None
+    try:
+        return resolve_osmium()
+    except OsmiumToolError:
+        return None
 
 
 def python_ok() -> bool:
@@ -271,7 +258,7 @@ class QABuddyApp(tk.Tk):
         if not python_ok():
             self.status_var.set("Python 3.12+ is required")
         elif not osmium:
-            self.status_var.set("Ready — Osmium was not detected yet")
+            self.status_var.set("Osmium Tool is missing or could not start")
         else:
             self.status_var.set("Ready")
 
@@ -290,6 +277,7 @@ class QABuddyApp(tk.Tk):
             env = os.environ.copy()
             osmium = find_osmium()
             if osmium:
+                env["OSMIUM_EXE"] = osmium
                 osmium_dir = str(Path(osmium).parent)
                 env["PATH"] = osmium_dir + os.pathsep + env.get("PATH", "")
             env["QABOT_WORK_DIR"] = str(REPO_DIR / "work")
@@ -332,12 +320,12 @@ class QABuddyApp(tk.Tk):
         if not tasks or not Path(tasks).is_file():
             messagebox.showwarning("Input required", "Please select a valid Task Grid GeoJSON file.")
             return
-        if not find_osmium():
-            messagebox.showerror(
-                "Osmium not found",
-                "Osmium was not detected. Install it in the active environment or add osmium.exe to PATH.",
-            )
+        try:
+            resolve_osmium()
+        except OsmiumToolError as exc:
+            messagebox.showerror("Osmium Tool unavailable", str(exc))
             return
+
 
         output = RUNS_DIR / datetime.now().strftime("%Y%m%d_%H%M%S")
         output.mkdir(parents=True, exist_ok=True)

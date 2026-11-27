@@ -5,6 +5,8 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from osmium_tool import OsmiumToolError, resolve_osmium
+
 JOSM_VERSION = "19613"
 JYTHON_VERSION = "2.7.3"
 TOOLS_DIR = Path(__file__).resolve().parent / "tools"
@@ -77,12 +79,13 @@ def main():
     ensure_python_dependencies()
     if not command_exists("java"):
         raise SystemExit("Java was not found on PATH. Install a 64-bit Java runtime, then reopen PowerShell.")
-    if not command_exists("osmium"):
-        raise SystemExit("Osmium was not found on PATH. Install osmium-tool, then reopen PowerShell.")
+    try:
+        osmium_path = resolve_osmium()
+    except OsmiumToolError as exc:
+        raise SystemExit(str(exc)) from exc
     java = subprocess.run(["java", "-version"], capture_output=True, text=True)
     print((java.stderr or java.stdout).splitlines()[0] if (java.stderr or java.stdout) else "Java detected")
-    osmium = subprocess.run(["osmium", "--version"], capture_output=True, text=True)
-    print((osmium.stdout or osmium.stderr).splitlines()[0] if (osmium.stdout or osmium.stderr) else "Osmium detected")
+    print(f"Osmium Tool: {osmium_path} (verified with --version)")
     download(JOSM_URL, TOOLS_DIR / f"josm-{JOSM_VERSION}.jar", JOSM_SHA256)
     download(JYTHON_URL, TOOLS_DIR / f"jython-{JYTHON_VERSION}.jar")
     print(f"\nReady. JOSM {JOSM_VERSION} and Jython {JYTHON_VERSION} are prepared in {TOOLS_DIR}.")

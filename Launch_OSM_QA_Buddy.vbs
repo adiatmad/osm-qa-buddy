@@ -1,40 +1,25 @@
 Option Explicit
 
-Dim shell, fso, repoDir, guiPath, pythonw, exec, line, rc
+Dim shell, fso, repoDir, bootstrapPath, command, rc
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
 repoDir = fso.GetParentFolderName(WScript.ScriptFullName)
-guiPath = fso.BuildPath(repoDir, "OSM_QA_Buddy_GUI.pyw")
+bootstrapPath = fso.BuildPath(repoDir, "bootstrap.ps1")
 
-If Not fso.FileExists(guiPath) Then
-    MsgBox "OSM_QA_Buddy_GUI.pyw was not found in:" & vbCrLf & repoDir, vbCritical, "OSM QA Buddy"
+If Not fso.FileExists(bootstrapPath) Then
+    MsgBox "bootstrap.ps1 was not found in:" & vbCrLf & repoDir, vbCritical, "OSM QA Buddy"
     WScript.Quit 1
 End If
 
-' Find pythonw.exe without opening a console window.
-On Error Resume Next
-Set exec = shell.Exec("cmd /c where pythonw.exe")
-pythonw = ""
-Do While Not exec.StdOut.AtEndOfStream
-    line = Trim(exec.StdOut.ReadLine)
-    If line <> "" And fso.FileExists(line) Then
-        pythonw = line
-        Exit Do
-    End If
-Loop
-On Error GoTo 0
+' Keep setup visible: first launch may download and install several components.
+command = "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File " & Chr(34) & bootstrapPath & Chr(34)
+rc = shell.Run(command, 1, True)
 
-If pythonw = "" Then
-    MsgBox "pythonw.exe was not found." & vbCrLf & vbCrLf & _
-           "Please make sure Python 3.12+ is installed and available in PATH.", _
-           vbCritical, "OSM QA Buddy"
-    WScript.Quit 1
+If rc <> 0 Then
+    MsgBox "OSM QA Buddy setup did not complete. Read the PowerShell window for the error details, then click the launcher again after correcting the issue.", vbExclamation, "OSM QA Buddy"
+    WScript.Quit rc
 End If
 
-shell.CurrentDirectory = repoDir
-rc = shell.Run(Chr(34) & pythonw & Chr(34) & " " & Chr(34) & guiPath & Chr(34), 0, False)
-
-Set exec = Nothing
 Set shell = Nothing
 Set fso = Nothing

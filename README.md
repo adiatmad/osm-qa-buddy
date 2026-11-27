@@ -40,16 +40,16 @@ Task-level QA results + map + report
 
 ## First launch: click the VBS file
 
-You do **not** need to install Python, Java, Osmium Tool, Conda, or JOSM yourself.
+You do **not** need to install Python, Java, Osmium Tool, or Conda yourself. **JOSM must already be installed** because it performs the validation.
 
 1. Download or clone this repository to a folder you can write to.
 2. Double-click **Launch_OSM_QA_Buddy.vbs**.
-3. On the first launch, a visible setup window downloads and verifies the official Miniforge installer, creates a private Python 3.12 environment, installs Shapely, Osmium Tool and OpenJDK, downloads the official current tested JOSM release and checks that it is a valid application JAR, then opens the GUI.
+3. On the first launch, a visible setup window downloads and verifies the official Miniforge installer, creates a private Python 3.12 environment, installs Shapely and Osmium Tool, then opens the GUI. It does not install Java or download JOSM.
 4. On later launches, the bootstrap checks the existing runtime, repairs missing dependencies if needed, and opens the GUI.
 
 The runtime is kept in `.qabot-runtime\` inside this checkout. It does not modify your global Python installation or Windows PATH and does not require administrator access. Keep the repository folder in place after setup.
 
-**First launch requires an internet connection and several hundred MB of free disk space.** The Miniforge installer is SHA-256 verified; the JOSM download is checked as a readable JOSM application archive. If setup fails, the PowerShell window stays open with the error; correct the issue and click the VBS again.
+**First launch requires an internet connection and several hundred MB of free disk space.** The Miniforge installer is SHA-256 verified. JOSM and Java are not downloaded or changed. If setup fails, the PowerShell window stays open with the error; correct the issue and click the VBS again.
 
 You do not need Git after downloading the repository as a ZIP. Git is only needed if you want to clone or update the source.
 
@@ -62,7 +62,7 @@ After the GUI opens:
 1. Choose your **OSM PBF** file.
 2. Choose the **Task Grid GeoJSON** file.
 3. Click **Start QA Run**. QA Buddy prepares `sample.osm`.
-4. Click **Open sample.osm in JOSM**. QA Buddy launches its prepared JOSM runtime directly; no Windows file association is needed.
+4. Click **Open sample.osm in JOSM**. QA Buddy asks Windows to open the file with your default `.osm` application. Make sure `.osm` files are associated with your installed JOSM.
 5. In JOSM, run Validator with **Shift+V**, review the findings, select the **Validation errors** layer, and use **File → Save As** to save the results as XML.
 6. Return to QA Buddy, open the **Finalize** tab, select the XML file, and click **Finalize QA Run**.
 
@@ -185,7 +185,7 @@ The private runtime lives in `.qabot-runtime\`. If that folder contains a clearl
 
 ### Osmium Tool is not detected
 
-The bootstrap installs and verifies the actual `osmium.exe` command-line tool in the private environment. The Python package named `osmium` (pyosmium) is not a replacement.
+The VBS bootstrap installs and verifies the actual `osmium.exe` command-line tool in the private environment. It does not install Java or JOSM. The Python package named `osmium` (pyosmium) is not a replacement.
 
 ### JOSM does not open `sample.osm`
 

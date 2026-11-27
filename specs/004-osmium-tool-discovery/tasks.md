@@ -16,7 +16,7 @@
 ## 3. Documentation and CI
 - [x] Make the VBS invoke the bootstrapper rather than searching for system Python.
 - [x] Document the first-run and subsequent-launch behavior.
-- [ ] Add Windows PowerShell parser validation to CI.
+- [x] Add Windows PowerShell 5.1 parser validation to CI.
 - [ ] Run Python syntax and regression tests against the final commit.
 
 ## 4. Acceptance

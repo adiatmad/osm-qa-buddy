@@ -60,7 +60,7 @@ function Test-Runtime {
     $oldPath = $env:PATH
     $env:PATH = "$EnvPrefix;$EnvPrefix\Scripts;$EnvPrefix\Library\bin;$EnvPrefix\Library\usr\bin;$oldPath"
     try {
-        & $PythonExe -c "import sys, shapely; assert sys.version_info[:2] == (3, 12); assert shapely.__version__ == '2.1.2'"
+        & $PythonExe -c "import sys, shapely, tkinter; assert sys.version_info[:2] == (3, 12); assert shapely.__version__ == '2.1.2'"
         if ($LASTEXITCODE -ne 0) { return $false }
         & $OsmiumExe --version *> $null
         if ($LASTEXITCODE -ne 0) { return $false }
@@ -76,17 +76,26 @@ function Test-Runtime {
 try {
     if (-not (Test-Path -LiteralPath $CondaExe)) {
         if (Test-Path -LiteralPath $CondaRoot) {
-            throw "A partial Miniforge folder exists at '$CondaRoot'. Remove only that incomplete .qabot-runtime\miniforge folder, then click the launcher again."
+            Write-Host "Removing an incomplete app-managed Miniforge installation..." -ForegroundColor Yellow
+            Remove-Item -LiteralPath $CondaRoot -Recurse -Force
         }
         New-Item -ItemType Directory -Path $RuntimeRoot -Force | Out-Null
         Install-Miniforge
+    }
+    else {
+        & $CondaExe --version *> $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Repairing the incomplete app-managed Miniforge installation..." -ForegroundColor Yellow
+            Remove-Item -LiteralPath $CondaRoot -Recurse -Force
+            Install-Miniforge
+        }
     }
 
     if (-not (Test-Runtime)) {
         Write-Host "Preparing the private Python, Shapely, Osmium Tool and Java runtime..." -ForegroundColor Cyan
         New-Item -ItemType Directory -Path $RuntimeRoot -Force | Out-Null
         if (Test-Path -LiteralPath (Join-Path $EnvPrefix "conda-meta")) {
-            Invoke-Checked $CondaExe @("install", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "shapely=2.1.2", "osmium-tool", "openjdk=21") "Runtime repair"
+            Invoke-Checked $CondaExe @("install", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "shapely=2.1.2", "tk", "osmium-tool", "openjdk=21") "Runtime repair"
         }
         else {
             Invoke-Checked $CondaExe @("create", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "shapely=2.1.2", "osmium-tool", "openjdk=21") "Runtime installation"

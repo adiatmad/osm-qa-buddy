@@ -1,3 +1,5 @@
+from io import BytesIO
+from unittest.mock import patch
 from zipfile import ZipFile
 
 from setup_native import is_valid_josm_jar
@@ -24,3 +26,12 @@ def test_rejects_zip_without_josm_application(tmp_path):
         archive.writestr("README.txt", "not JOSM")
 
     assert not is_valid_josm_jar(jar)
+
+
+def test_download_writes_the_response_without_a_missing_checksum_variable(tmp_path):
+    destination = tmp_path / "component.jar"
+    with patch("setup_native.urllib.request.urlopen", return_value=BytesIO(b"downloaded component")):
+        from setup_native import download
+        download("https://example.invalid/component.jar", destination)
+
+    assert destination.read_bytes() == b"downloaded component"

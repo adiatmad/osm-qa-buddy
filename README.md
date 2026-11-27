@@ -1,258 +1,297 @@
 # OSM QA Buddy
 
-**A simple third-pass QA helper for HOT Tasking Manager projects.**
+**A third-pass quality-assurance helper for HOT Tasking Manager projects.**
 
-> **QA Buddy finds things to look at. A human makes the decision.**
+> QA Buddy identifies OSM features and tasks that deserve attention. A human mapper makes the decision.
 
-OSM QA Buddy takes an already-mapped HOT Tasking Manager project, finds JOSM validation issues, connects those issues to task-grid cells, and produces a simple list of tasks that may need another look.
+OSM QA Buddy takes an existing OSM extract and a HOT Task Grid, prepares the data for JOSM validation, and turns the saved validation findings into task-level QA outputs.
 
-It is **not** a replacement for mapping, normal validation, or human review.
+The recommended workflow uses the normal **JOSM desktop Validator**. QA Buddy handles data preparation, reading JOSM's native XML export, filtering findings to the project's QA scope, associating findings with task cells, and producing reports.
+
+**QA Buddy does not fix OSM data, replace JOSM, or decide whether a finding is valid.**
 
 ---
 
-## The easiest way to use it
+## Choose your workflow
 
-If you are new to QA Buddy, use the **JOSM GUI Validation Bridge**.
+| Workflow | Best for | Entry point |
+|---|---|---|
+| **JOSM GUI Validation Bridge** (recommended) | Mappers and project teams who want to run the normal JOSM Validator and review findings themselves | Double-click `Launch_OSM_QA_Buddy.vbs` |
+| Legacy native/headless pipeline | Existing automated runs, regression checks, and development | `run_qa.bat` |
 
-The idea is deliberately simple:
+Use the GUI bridge unless you specifically need the legacy automated pipeline. The two workflows have different setup requirements; the GUI bootstrap does not prepare the legacy Java/JOSM/Jython toolchain.
+
+## How the recommended workflow works
 
 ```text
-Your OSM data + Task Grid
-        ↓
-   QA Buddy prepares
-        ↓
-     sample.osm
-        ↓
-   Open in normal JOSM
-        ↓
-   Run JOSM Validator
-        ↓
- Save Validation errors XML
-        ↓
-   QA Buddy finalizes
-        ↓
-Task-level QA results + map + report
+OSM PBF extract + HOT Task Grid GeoJSON
+                  |
+                  v
+       QA Buddy checks the inputs
+                  |
+                  v
+       Osmium clips the OSM data
+       to the Task Grid geometry
+                  |
+                  v
+              sample.osm
+                  |
+                  v
+       Open in your installed JOSM
+                  |
+                  v
+       Run the normal JOSM Validator
+       Review findings; save the
+       "Validation errors" layer as XML
+                  |
+                  v
+          QA Buddy finalizes
+                  |
+                  v
+       Parse native JOSM XML
+       Apply QA-scope filter
+       Match findings to task cells
+       Generate GeoJSON, report, map
 ```
 
-**JOSM does the validation. QA Buddy does the preparation, task matching, and reporting.**
+**JOSM is the validation engine.** QA Buddy does not duplicate JOSM's validation rules or silently run a second validator in the GUI workflow.
 
 ---
 
-## First launch: click the VBS file
+## Requirements
 
-You do **not** need to install Python, Java, Osmium Tool, or Conda yourself. **JOSM must already be installed** because it performs the validation.
+### Recommended GUI workflow
 
-1. Download or clone this repository to a folder you can write to.
-2. Double-click **Launch_OSM_QA_Buddy.vbs**.
-3. On the first launch, a visible setup window downloads and verifies the official Miniforge installer, creates a private Python 3.12 environment, installs Shapely and Osmium Tool, then opens the GUI. It does not install Java or download JOSM.
-4. On later launches, the bootstrap checks the existing runtime, repairs missing dependencies if needed, and opens the GUI.
+- Windows 10/11.
+- An internet connection for the first launch and dependency setup.
+- A writable folder containing this repository.
+- **JOSM already installed** and configured to open `.osm` files.
+- An OSM PBF extract covering the project area.
+- The HOT Task Grid as GeoJSON.
 
-The runtime is kept in `.qabot-runtime\` inside this checkout. It does not modify your global Python installation or Windows PATH and does not require administrator access. Keep the repository folder in place after setup.
+You do **not** need to install Python, Conda/Miniforge, or Osmium Tool manually for the recommended GUI workflow. The launcher prepares a private runtime for this checkout.
 
-**First launch requires an internet connection and several hundred MB of free disk space.** The Miniforge installer is SHA-256 verified. JOSM and Java are not downloaded or changed. If setup fails, the PowerShell window stays open with the error; correct the issue and click the VBS again.
+The GUI bootstrap does **not** install Java or JOSM. It uses the Windows file association to open `sample.osm` in your existing JOSM installation.
 
-You do not need Git after downloading the repository as a ZIP. Git is only needed if you want to clone or update the source.
+### Legacy native/headless workflow
 
----
+The legacy workflow has separate prerequisites:
 
-# Quick start: JOSM GUI Validation Bridge
+- Python 3.12 or newer.
+- A compatible Java runtime.
+- A working Osmium Tool executable.
+- The JOSM and Jython components prepared by `setup_native.py`.
 
-After the GUI opens:
-
-1. Choose your **OSM PBF** file.
-2. Choose the **Task Grid GeoJSON** file.
-3. Click **Start QA Run**. QA Buddy prepares `sample.osm`.
-4. Click **Open sample.osm in JOSM**. QA Buddy asks Windows to open the file with your default `.osm` application. Make sure `.osm` files are associated with your installed JOSM.
-5. In JOSM, run Validator with **Shift+V**, review the findings, select the **Validation errors** layer, and use **File → Save As** to save the results as XML.
-6. Return to QA Buddy, open the **Finalize** tab, select the XML file, and click **Finalize QA Run**.
-
-QA Buddy then produces the task-level results, map, and report. The GUI stores each run in a timestamped folder under `gui_runs\` inside the repository. The GUI shows the active output folder and provides buttons to open the generated report and map.
-
-The project boundary is not a separate input for this bridge; the Task Grid is the authoritative extraction geometry.
+The GUI's private `.qabot-runtime\` environment does not install or configure this legacy toolchain.
 
 ---
 
-# What you get
+## Install and launch (Windows GUI)
 
-The most useful file for a project manager is:
+1. Download the repository as a ZIP and extract it, or clone it with Git.
+2. Keep the extracted repository in a folder where your Windows account can write files.
+3. Double-click **`Launch_OSM_QA_Buddy.vbs`**.
+4. On first launch, the visible PowerShell setup downloads the official Miniforge installer, checks its SHA-256 digest, creates a private Python 3.12 environment, installs the required packages and Osmium Tool, verifies the runtime, and starts the GUI.
+5. On later launches, the bootstrap checks the existing runtime, repairs missing dependencies when possible, and starts the GUI.
 
-### `task_grid_qa_summary.geojson`
+The runtime is stored inside this checkout at `.qabot-runtime\`. It does not register a global Python installation, modify Windows PATH permanently, or require administrator privileges. Keep the repository folder in place; the launcher and runtime live there.
 
-This is the task grid with QA information added to each task, including finding counts and a simple `qa_priority`.
+First launch needs internet access and several hundred MB of free disk space. If setup fails, read the visible PowerShell error, fix the underlying issue, and run the VBS launcher again. Do not delete your run-output folders to repair the runtime.
 
-It helps answer:
+You do not need Git after downloading a ZIP. Git is only needed to clone the repository or pull future updates.
 
-> **Which tasks should I look at first?**
+---
 
-Other useful outputs include:
+## Run a QA check
 
-| File | What it is |
+### 1. Prepare the sample
+
+In the GUI's **Prepare** tab:
+
+1. Select the regional **OSM PBF** file (`.osm.pbf`).
+2. Select the HOT **Task Grid GeoJSON** file.
+3. Click **Start QA Run**.
+
+QA Buddy performs input checks, extracts the OSM data using the union of the Task Grid geometries, and creates a run folder under `gui_runs\` with a timestamp. When preparation completes, the GUI shows the path to `sample.osm` and moves to the JOSM validation step.
+
+For this workflow, the Task Grid is the extraction geometry. A separate project-boundary file is not required.
+
+### 2. Validate in JOSM
+
+1. In the GUI's **Validate in JOSM** tab, click **Open sample.osm in JOSM**.
+2. If Windows does not open JOSM, associate `.osm` files with your installed JOSM and try again.
+3. In JOSM, run Validator with **Shift+V**. Run it without a selection if you intend to validate the whole prepared sample.
+4. Review the Validation errors layer in JOSM.
+5. Select the **Validation errors** layer and use **File → Save As** to export it as XML.
+
+Save the XML wherever convenient. Its filename does not need to be `validation_errors.xml`; QA Buddy asks you to select the file in the next step.
+
+**Important:** JOSM's Validator window shows the findings produced by your normal JOSM configuration. QA Buddy applies its own project-scope filter after reading the XML. Do not assume the JOSM window itself has already been filtered by QA Buddy.
+
+### 3. Finalize in QA Buddy
+
+1. Return to the GUI and open the **Finalize** tab.
+2. Select the XML file exported from JOSM.
+3. Click **Finalize QA Run**.
+4. When processing finishes, use **Open Report** and **Open Map** if those outputs are available.
+
+QA Buddy parses the native JOSM XML, filters findings to the supported QA scope, associates finding locations with Task Grid cells, and generates task-level outputs.
+
+The GUI remembers the latest run's Task Grid, sample, and output folder in a small local session file. Keep the input files and repository run folder available until finalization is complete.
+
+---
+
+## What findings are included?
+
+JOSM runs its normal validator configuration. QA Buddy then applies a thematic filter to the exported findings:
+
+- Findings affecting OSM objects tagged `building=*`.
+- Findings affecting OSM objects tagged `highway=*`.
+- Generic **TagChecker** findings.
+- **DuplicateNode** findings.
+
+Address-validation findings are excluded. Other unrelated feature families are excluded unless they fall into one of the explicitly retained generic categories.
+
+For generic geometry/topology checks, QA Buddy uses the affected OSM primitives in the prepared sample to determine whether a finding concerns a building or highway. It does not rely only on the validator's rule name.
+
+This filter controls what appears in QA Buddy's final findings and task summary. It does not change JOSM's validator rules or preferences.
+
+---
+
+## Understand the outputs
+
+Each GUI run is stored in its own timestamped folder under `gui_runs\`. The GUI displays the active folder.
+
+| Output | Purpose |
 |---|---|
-| `task_grid_qa_summary.geojson` | Task-level QA summary |
-| `qa_errors.geojson` | JOSM findings as GeoJSON |
-| `report.html` | Human-readable report |
-| `map.html` | Interactive map |
-| `validation_errors.xml` | Native JOSM validation export |
-| `sample.osm` | The clipped OSM data checked by JOSM |
-| `run_metadata.json` | Information needed to reproduce/debug the run |
+| `task_grid_qa_summary.geojson` | Original Task Grid with QA counts, rule summaries, task status, and `qa_priority` added to task properties |
+| `qa_errors.geojson` | Filtered JOSM findings as GeoJSON |
+| `report.html` | Human-readable QA report |
+| `map.html` | Interactive map of QA findings and task results |
+| `validation_errors.xml` | Copy of the XML exported from JOSM |
+| `sample.osm` | OSM dataset prepared for JOSM validation |
+| `sample.osm.ready.json` | Preparation hand-off metadata; not an OSM file |
+| `run_metadata.json` | Run inputs, validation mode/status, and processing metadata |
 
-The files are written to the current run folder (shown in the GUI), not directly to the repository root.
+The most useful output for project coordination is usually **`task_grid_qa_summary.geojson`**. It lets a team inspect QA signals by task instead of treating the whole project as one undifferentiated result.
 
----
+### What does `qa_priority` mean?
 
-# What does `qa_priority` mean?
+It is a sorting aid, **not an AI score, a quality grade, or proof that a task is wrong**.
 
-It is **not an AI score** and it does not say that a task is bad.
+| Priority | Current rule |
+|---|---|
+| **HIGH** | Task is marked `BADIMAGERY`, or has at least 5 unique findings, or at least 5 unique OSM objects |
+| **MEDIUM** | At least 2 unique findings, or at least 2 unique OSM objects, without a HIGH condition |
+| **LOW** | At least one finding, without a HIGH or MEDIUM condition |
+| **NONE** | No finding signal and task is not marked BADIMAGERY |
 
-It is only a simple way to sort tasks for human review:
+Always inspect the actual findings and the OSM context before contacting a mapper or changing data. A finding can be a false positive, a data issue outside the mapper's control, or something that needs local knowledge.
 
-- **HIGH** — BADIMAGERY or many findings
-- **MEDIUM** — several findings
-- **LOW** — a small finding signal
-- **NONE** — no QA finding signal
+### Unassigned findings
 
-Always inspect the actual JOSM findings before deciding what to do.
-
----
-
-# Why use the JOSM GUI?
-
-QA Buddy deliberately does **not** create its own copy of JOSM's validation rules.
-
-Instead:
-
-- **JOSM** = validation engine
-- **QA Buddy** = preparation + parsing + task attribution + reporting
-
-This means the validation result comes from the normal JOSM Validator that mappers already know.
-
-QA Buddy reads JOSM's native **Validation errors XML** after you save it.
+Findings are assigned to tasks when their reported location is covered by a Task Grid polygon. Findings that do not fall inside any task polygon are preserved as unassigned rather than being forced into a task. This can happen near task boundaries or outside the grid.
 
 ---
 
-# A real test
+## Optional: send review candidates to BetterWorkspace
 
-The GUI bridge was tested on Windows with a real Nepal dataset and **JOSM 19613**.
+QA Buddy includes an optional exporter for a separate JOSM-compatible review layer. It is intended for use with BetterWorkspace's existing multi-validation workflow; it is not required for normal QA Buddy reporting.
 
-One completed run produced:
-
-- **17,202** raw JOSM findings
-- **15,768** task-associated findings
-- **1,435** unassigned findings
-- **1** BADIMAGERY task
-
-QA Buddy successfully produced the task summary, report, and map.
-
-The unassigned findings are preserved rather than being forced into a task. They can occur when findings fall outside task polygons or involve geometry around task boundaries.
-
-This is real field-validation evidence for the workflow, **not a guarantee that every JOSM version, dataset, or geometry will behave identically**.
-
----
-
-# Existing native/headless workflow
-
-QA Buddy also retains a separate automated/headless workflow, mainly as a regression and development path. It is not the recommended first-run workflow for people who want to validate interactively in JOSM.
-
-Start it with:
-
-```cmd
-run_qa.bat
-```
-
-Unlike the GUI bridge, this path has additional native prerequisites: a compatible Java runtime, the JOSM and Jython components prepared by `setup_native.py`, and a working Osmium Tool installation. The private `.qabot-runtime\` bootstrap is for the GUI bridge; it does not install Java or prepare the headless JOSM/Jython toolchain.
-
-For normal interactive validation with the JOSM installation already on your computer, use the **GUI Validation Bridge** described above.
-
----
-
-# Data sources
-
-QA Buddy can work with data from the usual HOT/OpenStreetMap sources, including:
-
-- HOT Tasking Manager task grids and project boundaries
-- Geofabrik `.osm.pbf` extracts
-- JOSM validation
-
-You can also use files you already downloaded locally.
-
----
-
-# Troubleshooting
-
-### First-run setup fails
-
-Read the error in the PowerShell window. Check your internet connection, available disk space, and whether security software or a managed network is blocking GitHub or conda-forge downloads. Then click the VBS launcher again; completed downloads and packages are reused.
-
-The private runtime lives in `.qabot-runtime\`. If that folder contains a clearly incomplete Miniforge installation, close QA Buddy, remove only `.qabot-runtime\miniforge\`, and retry. Do not delete the whole repository or your QA run folders.
-
-### Osmium Tool is not detected
-
-The VBS bootstrap installs and verifies the actual `osmium.exe` command-line tool in the private environment. It does not install Java or JOSM. The Python package named `osmium` (pyosmium) is not a replacement.
-
-### JOSM does not open `sample.osm`
-
-Make sure you opened:
-
-```text
-sample.osm
-```
-
-not:
-
-```text
-sample.osm.ready.json
-```
-
-### Finalize says the XML is missing
-
-Check that JOSM actually saved the **Validation errors** layer as XML and that the path in your `finalize` command points to that file. The XML filename and folder can be anything; the path just needs to point to the file you saved.
-
-### Finalize fails or the Report/Map buttons are unavailable
-
-The GUI now displays the pipeline exit code and recent log lines when finalization fails. Check those diagnostics first. Report and Map buttons are enabled only when their corresponding HTML files exist; if a failure happens after one output was generated, that output remains available. The run folder is shown in the GUI, and you can inspect it directly under `gui_runs\`.
-
-### There are many findings
-
-That is not automatically a failure. QA Buddy reports what JOSM found. Review the findings before deciding whether anything needs fixing.
-
-### Some findings are unassigned
-
-That is expected in some datasets. QA Buddy keeps them instead of guessing which task they belong to.
-
----
-
-# Optional: export review candidates for BetterWorkspace
-
-After a QA run, you can export candidate OSM ways from `qa_errors.geojson` into a separate JOSM-compatible OSM layer for BetterWorkspace's existing multi-validation workflow. This is an optional hand-off, not an automatic validation or upload step.
-
-Run from the repository folder with the same Python environment used by QA Buddy:
+Run this from the repository folder after a GUI run has produced `qa_errors.geojson`. Use the private Python runtime created by the launcher:
 
 ```cmd
 ".qabot-runtime\env\python.exe" betterworkspace_export.py "gui_runs\YOUR_RUN\qa_errors.geojson" "gui_runs\YOUR_RUN\sample.osm" "gui_runs\YOUR_RUN\betterworkspace_candidates.osm" --task-grid "C:\data\task_grid.geojson"
 ```
 
-The command also writes `betterworkspace_candidates.json` as a sidecar provenance manifest (or use `--manifest` to choose another path). The OSM layer contains copied source ways and their referenced nodes; QA metadata and task attribution stay in the JSON manifest rather than being added as OSM tags. The first implementation exports ways only. Open the candidate layer in JOSM and use BetterWorkspace's existing multi-validation workflow to add the ways to Todo. Human review is still required.
+Replace `YOUR_RUN` and the task-grid path with the actual paths on your computer.
 
-# More documentation
+The exporter creates:
 
-Detailed GUI bridge documentation:
+- `betterworkspace_candidates.osm`: candidate **ways** and their referenced nodes, copied from the prepared source dataset.
+- `betterworkspace_candidates.json`: sidecar manifest with finding details, provenance, and task IDs when recoverable.
 
-[`docs/josm-gui-validation-bridge.md`](docs/josm-gui-validation-bridge.md)
+The first interoperability milestone is **way-first**: node-only and relation-only findings remain in the normal QA Buddy outputs but are not exported as BetterWorkspace candidates. QA metadata is kept in the JSON manifest, not injected into OSM tags. Open the candidate layer in JOSM and use BetterWorkspace's existing workflow to add the ways to Todo. A human mapper must review each candidate.
 
-The repository also contains the project's Spec Kit and Anti-Slop engineering notes under `specs/`.
+The exporter does not depend on BetterWorkspace internals, does not upload or edit OSM data, and does not automatically mark anything as fixed.
 
 ---
 
-# Development status
+## Legacy native/headless workflow
 
-OSM QA Buddy is an **unofficial tool under active development**.
+The older automated pipeline remains available for existing users and regression/development work. Start it from Windows Command Prompt:
 
-The project follows a simple principle:
+```cmd
+run_qa.bat
+```
 
-> **Keep the tool boring, reproducible, and useful.**
+This launcher checks for Python 3.12+, runs `setup_native.py`, and starts the older GUI/application path. The native setup prepares the JOSM tested JAR and (unless `--gui-only` is used) Jython 2.7.3. Java and a working Osmium Tool must be available.
 
-QA output is evidence for human review, not an unquestionable answer.
+This is a separate architecture from the recommended GUI Validation Bridge:
 
-## AI-Assisted Development
+- The **GUI bridge** asks the user to run JOSM Validator and save its Validation errors XML.
+- The **legacy pipeline** runs its automated JOSM/Jython validation path and downloads its configured HOT and third-pass rule sources.
 
-This project was developed and/or maintained with AI assistance. AI was used to support parts of the design, implementation, documentation, and/or maintenance workflow. The human maintainer remains responsible for reviewing, validating, and approving the project's code and outputs.
+Do not use the GUI bootstrap as evidence that the legacy prerequisites are installed.
+
+---
+
+## Troubleshooting
+
+### The first-launch setup does not complete
+
+Read the PowerShell window's error. Check internet access, free disk space, and whether your network or security software blocks GitHub or conda-forge downloads. Then run the VBS launcher again.
+
+If Miniforge itself is visibly incomplete, close QA Buddy and remove only `.qabot-runtime\miniforge\` before retrying. Do not delete the whole repository or `gui_runs\`.
+
+### Osmium Tool is not detected
+
+The GUI bootstrap installs the actual `osmium.exe` command-line tool in the private runtime. The Python package named `osmium` (pyosmium) is not a replacement for the Osmium Tool executable.
+
+### JOSM does not open `sample.osm`
+
+Check the Windows file association for `.osm` files and point it to your installed JOSM. Open `sample.osm`, not `sample.osm.ready.json`; the latter is only a metadata hand-off marker.
+
+### I cannot find the JOSM XML file during finalization
+
+In JOSM, select the **Validation errors** layer and save that layer as XML. Then select the exact saved file in QA Buddy's Finalize tab. The XML can have any filename and can be stored outside the run folder.
+
+### Finalization fails
+
+The GUI reports the pipeline exit code and recent log lines. Read those diagnostics first and inspect the active timestamped run folder under `gui_runs\`. If a report or map was generated before a later failure, its button remains enabled as long as the corresponding HTML file exists.
+
+### The Report or Map button is disabled
+
+The button is enabled only when its corresponding `report.html` or `map.html` file exists in the active run folder. Check the finalization log and folder contents.
+
+### There are many findings
+
+A large finding count is not automatically a failed run or proof of poor mapping. Review the finding types, affected OSM objects, and local context.
+
+### Some findings are unassigned
+
+This is expected when a finding location is outside all task polygons. QA Buddy preserves these findings rather than guessing a task assignment.
+
+---
+
+## More documentation
+
+- [JOSM GUI Validation Bridge details](docs/josm-gui-validation-bridge.md)
+
+---
+
+## Project status and principles
+
+OSM QA Buddy is an unofficial tool under active development.
+
+- JOSM remains the validation authority in the recommended GUI workflow.
+- QA Buddy reports evidence; it does not make mapping decisions.
+- Task attribution is geometric and may leave findings unassigned.
+- BetterWorkspace export is an optional review hand-off, not an edit or upload mechanism.
+- Outputs should be reviewed by people familiar with the project and local mapping context.
+
+> Keep the workflow reproducible, the outputs inspectable, and the human decision-maker in control.
+
+## AI-assisted development
+
+AI tools have supported parts of the project's design, implementation, documentation, and maintenance. The human maintainer remains responsible for reviewing, validating, and approving code changes and QA outputs.

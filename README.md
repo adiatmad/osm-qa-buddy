@@ -66,7 +66,7 @@ After the GUI opens:
 5. In JOSM, run Validator with **Shift+V**, review the findings, select the **Validation errors** layer, and use **File → Save As** to save the results as XML.
 6. Return to QA Buddy, open the **Finalize** tab, select the XML file, and click **Finalize QA Run**.
 
-QA Buddy then produces the task-level results, map, and report. The GUI stores each run in a timestamped folder under `gui_runs\\` inside the repository. The GUI shows the active output folder and provides buttons to open the generated report and map.
+QA Buddy then produces the task-level results, map, and report. The GUI stores each run in a timestamped folder under `gui_runs\` inside the repository. The GUI shows the active output folder and provides buttons to open the generated report and map.
 
 The project boundary is not a separate input for this bridge; the Task Grid is the authoritative extraction geometry.
 
@@ -159,7 +159,7 @@ Start it with:
 run_qa.bat
 ```
 
-Unlike the GUI bridge, this path has additional native prerequisites: a compatible Java runtime, the JOSM and Jython components prepared by `setup_native.py`, and a working Osmium Tool installation. The private `.qabot-runtime\\` bootstrap is for the GUI bridge; it does not install Java or prepare the headless JOSM/Jython toolchain.
+Unlike the GUI bridge, this path has additional native prerequisites: a compatible Java runtime, the JOSM and Jython components prepared by `setup_native.py`, and a working Osmium Tool installation. The private `.qabot-runtime\` bootstrap is for the GUI bridge; it does not install Java or prepare the headless JOSM/Jython toolchain.
 
 For normal interactive validation with the JOSM installation already on your computer, use the **GUI Validation Bridge** described above.
 
@@ -209,7 +209,7 @@ Check that JOSM actually saved the **Validation errors** layer as XML and that t
 
 ### Finalize fails or the Report/Map buttons are unavailable
 
-The GUI now displays the pipeline exit code and recent log lines when finalization fails. Check those diagnostics first. Report and Map buttons are enabled only when their corresponding HTML files exist; if a failure happens after one output was generated, that output remains available. The run folder is shown in the GUI, and you can inspect it directly under `gui_runs\\`.
+The GUI now displays the pipeline exit code and recent log lines when finalization fails. Check those diagnostics first. Report and Map buttons are enabled only when their corresponding HTML files exist; if a failure happens after one output was generated, that output remains available. The run folder is shown in the GUI, and you can inspect it directly under `gui_runs\`.
 
 ### There are many findings
 
@@ -228,7 +228,7 @@ After a QA run, you can export candidate OSM ways from `qa_errors.geojson` into 
 Run from the repository folder with the same Python environment used by QA Buddy:
 
 ```cmd
-python betterworkspace_export.py "gui_runs\\YOUR_RUN\\qa_errors.geojson" "gui_runs\\YOUR_RUN\\sample.osm" "gui_runs\\YOUR_RUN\\betterworkspace_candidates.osm" --task-grid "C:\\data\\task_grid.geojson"
+".qabot-runtime\env\python.exe" betterworkspace_export.py "gui_runs\YOUR_RUN\qa_errors.geojson" "gui_runs\YOUR_RUN\sample.osm" "gui_runs\YOUR_RUN\betterworkspace_candidates.osm" --task-grid "C:\data\task_grid.geojson"
 ```
 
 The command also writes `betterworkspace_candidates.json` as a sidecar provenance manifest (or use `--manifest` to choose another path). The OSM layer contains copied source ways and their referenced nodes; QA metadata and task attribution stay in the JSON manifest rather than being added as OSM tags. The first implementation exports ways only. Open the candidate layer in JOSM and use BetterWorkspace's existing multi-validation workflow to add the ways to Todo. Human review is still required.

@@ -11,11 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check Python syntax
-        run: python3 -m py_compile app.py orchestrator.py gui_pipeline.py josm_validation_xml.py josm_validation_filter.py setup_native.py preflight.py report.py run_wizard.py test_smoke.py test_preflight.py test_report_integrity.py native_smoke.py tests/test_josm_validation_xml.py tests/test_gui_pipeline.py tests/test_josm_validation_filter.py betterworkspace_export.py tests/test_betterworkspace_export.py
+        run: python3 -m py_compile app.py orchestrator.py gui_pipeline.py josm_validation_xml.py josm_validation_filter.py setup_native.py osmium_tool.py OSM_QA_Buddy_GUI.pyw preflight.py test_osmium_tool.py report.py run_wizard.py test_smoke.py test_preflight.py test_report_integrity.py native_smoke.py tests/test_josm_validation_xml.py tests/test_gui_pipeline.py tests/test_josm_validation_filter.py betterworkspace_export.py tests/test_betterworkspace_export.py tests/test_setup_native.py
       - name: Install test dependencies
         run: python3 -m pip install -r requirements.txt
       - name: Run smoke tests
         run: python3 test_smoke.py
+      - name: Run Osmium discovery regression tests
+        run: python3 -m unittest test_osmium_tool.py
       - name: Run preflight regression tests
         run: python3 -m unittest test_preflight.py
       - name: Run report integrity regression tests
@@ -28,9 +30,35 @@ jobs:
         run: python3 -m unittest tests/test_gui_pipeline.py
       - name: Install pytest for function-style exporter tests
         run: python3 -m pip install pytest
+      - name: Run native setup helper tests
+        run: python3 -m pytest -q tests/test_setup_native.py
       - name: Run BetterWorkspace review-candidate export tests
         run: python3 -m pytest -q tests/test_betterworkspace_export.py
       - name: Run native workflow checks
         run: python3 native_smoke.py
       - name: Build Docker image
         run: docker build -t qabot .
+
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Parse PowerShell bootstrap
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "bootstrap.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+      - name: Check Python syntax on Windows
+        run: python -m py_compile setup_native.py osmium_tool.py OSM_QA_Buddy_GUI.pyw

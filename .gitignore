@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+.qabot-runtime/
 tools/*.jar
 work/
 osm_qa_buddy_results/

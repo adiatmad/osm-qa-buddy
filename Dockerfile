@@ -7,9 +7,10 @@ RUN apt-get update \
 WORKDIR /app
 
 RUN python3 -m pip install --no-cache-dir shapely
-# Pin the JOSM build used by the QA instrument. Do not silently follow josm-tested.jar updates.
-RUN wget -q https://josm.openstreetmap.de/download/josm-snapshot-19613.jar -O /app/josm-tested.jar
-RUN wget -q https://repo1.maven.org/maven2/org/python/jython-standalone/2.7.3/jython-standalone-2.7.3.jar -O /app/jython.jar
+# Use the official current tested JOSM release (the old 19613 snapshot is no longer hosted).
+RUN mkdir -p /app/tools \
+    && wget -q https://josm.openstreetmap.de/download/josm-tested.jar -O /app/tools/josm-tested.jar \
+    && wget -q https://repo1.maven.org/maven2/org/python/jython-standalone/2.7.3/jython-standalone-2.7.3.jar -O /app/tools/jython-2.7.3.jar
 
 COPY bot.py orchestrator.py preflight.py report.py /app/
 

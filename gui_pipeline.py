@@ -121,12 +121,17 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
     if not os.path.isfile(sample_path):
         raise RuntimeError("Prepared JOSM sample is missing. Run 'prepare' first and use the same QABOT_WORK_DIR when finalizing.")
 
+    print("[+] Parsing JOSM validation XML...", flush=True)
     raw_findings = c["parse_josm_validation_xml"](xml_path)
+    print(f"[+] Parsed {len(raw_findings)} raw findings. Filtering to QA targets...", flush=True)
     findings, filtered_out_count = c["filter_josm_findings"](raw_findings, sample_path)
     errors_path = os.path.join(work_dir, "qa_errors.geojson")
+    print(f"[+] Writing {len(findings)} target findings to GeoJSON...", flush=True)
     c["write_geojson"](findings, errors_path)
 
+    print("[+] Assigning findings to task grid (may take time)...", flush=True)
     summary_path = c["aggregate_errors_to_tasks"](tasks_path, errors_path)
+    print("[+] Task aggregation complete. Generating report and map...", flush=True)
     report_path = os.path.join(work_dir, "report.html")
     map_path = os.path.join(work_dir, "map.html")
     c["update_run_metadata"](
@@ -143,6 +148,7 @@ def finalize_gui_run(tasks_path, validation_xml_path, output_dir):
         validation_filter="building + highway + generic tagging + duplicate nodes; address excluded",
     )
     c["generate_report"](errors_path, summary_path, report_path, map_path, metadata_path)
+    print("[+] Report/map generated. Copying files to run output...", flush=True)
 
     for name in (
         "qa_errors.geojson",

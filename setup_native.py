@@ -1,34 +1,26 @@
-import hashlib
+import argparse
 import shutil
 import subprocess
 import sys
 import urllib.request
+import zipfile
 from pathlib import Path
 
-JOSM_VERSION = "19613"
+from osmium_tool import OsmiumToolError, resolve_osmium
+
+JOSM_VERSION = "tested"
 JYTHON_VERSION = "2.7.3"
 TOOLS_DIR = Path(__file__).resolve().parent / "tools"
 REQUIREMENTS_FILE = Path(__file__).resolve().parent / "requirements.txt"
-JOSM_URL = f"https://josm.openstreetmap.de/download/josm-snapshot-{JOSM_VERSION}.jar"
+JOSM_URL = "https://josm.openstreetmap.de/download/josm-tested.jar"
 JYTHON_URL = f"https://repo1.maven.org/maven2/org/python/jython-standalone/{JYTHON_VERSION}/jython-standalone-{JYTHON_VERSION}.jar"
-JOSM_SHA256 = "7bba9b5d5eb57db390672ddce571a67de9d5cf0b0e8fe610c4dbde15fbe59077"
 
 
-def sha256(path):
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def download(url, destination, expected_sha256=None):
+def download(url, destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists() and destination.stat().st_size > 100000:
-        if expected_sha256 is None or sha256(destination) == expected_sha256:
-            print(f"OK: {destination.name} already exists")
-            return
-        destination.unlink()
+        print(f"OK: {destination.name} already exists")
+        return
     print(f"Downloading {destination.name}...")
     try:
         with urllib.request.urlopen(url, timeout=60) as response, open(destination, "wb") as output:
@@ -36,9 +28,15 @@ def download(url, destination, expected_sha256=None):
     except Exception:
         destination.unlink(missing_ok=True)
         raise
-    if expected_sha256 and sha256(destination) != expected_sha256:
-        destination.unlink(missing_ok=True)
-        raise RuntimeError(f"SHA-256 verification failed for {destination.name}.")
+
+
+def is_valid_josm_jar(path):
+    """Return whether the file is a readable JOSM application JAR."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return "org/openstreetmap/josm/gui/MainApplication.class" in archive.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return False
 
 
 def command_exists(name):
@@ -70,6 +68,14 @@ def ensure_python_dependencies():
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Prepare OSM QA Buddy native dependencies.")
+    parser.add_argument(
+        "--gui-only",
+        action="store_true",
+        help="Prepare the verified JOSM GUI runtime without downloading the legacy Jython component.",
+    )
+    args = parser.parse_args()
+
     print("OSM QA Buddy — native Windows setup")
     print("====================================")
     if sys.version_info < (3, 12):
@@ -77,15 +83,25 @@ def main():
     ensure_python_dependencies()
     if not command_exists("java"):
         raise SystemExit("Java was not found on PATH. Install a 64-bit Java runtime, then reopen PowerShell.")
-    if not command_exists("osmium"):
-        raise SystemExit("Osmium was not found on PATH. Install osmium-tool, then reopen PowerShell.")
+    try:
+        osmium_path = resolve_osmium()
+    except OsmiumToolError as exc:
+        raise SystemExit(str(exc)) from exc
     java = subprocess.run(["java", "-version"], capture_output=True, text=True)
     print((java.stderr or java.stdout).splitlines()[0] if (java.stderr or java.stdout) else "Java detected")
-    osmium = subprocess.run(["osmium", "--version"], capture_output=True, text=True)
-    print((osmium.stdout or osmium.stderr).splitlines()[0] if (osmium.stdout or osmium.stderr) else "Osmium detected")
-    download(JOSM_URL, TOOLS_DIR / f"josm-{JOSM_VERSION}.jar", JOSM_SHA256)
-    download(JYTHON_URL, TOOLS_DIR / f"jython-{JYTHON_VERSION}.jar")
-    print(f"\nReady. JOSM {JOSM_VERSION} and Jython {JYTHON_VERSION} are prepared in {TOOLS_DIR}.")
+    print(f"Osmium Tool: {osmium_path} (verified with --version)")
+    josm_jar = TOOLS_DIR / "josm-tested.jar"
+    if josm_jar.exists() and not is_valid_josm_jar(josm_jar):
+        josm_jar.unlink()
+    download(JOSM_URL, josm_jar)
+    if not is_valid_josm_jar(josm_jar):
+        josm_jar.unlink(missing_ok=True)
+        raise RuntimeError("The official JOSM download is not a valid JOSM application JAR.")
+    if not args.gui_only:
+        download(JYTHON_URL, TOOLS_DIR / f"jython-{JYTHON_VERSION}.jar")
+    print(f"\nReady. The current tested JOSM release is prepared in {TOOLS_DIR}.")
+    if not args.gui_only:
+        print(f"Jython {JYTHON_VERSION} is also prepared in {TOOLS_DIR}.")
 
 
 if __name__ == "__main__":

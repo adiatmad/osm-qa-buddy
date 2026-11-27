@@ -3,7 +3,9 @@
 ## Purpose
 
 QA Buddy does not reimplement JOSM validation. It prepares the Task Grid clip,
-then consumes JOSM's native **Validation errors** XML export.
+then consumes JOSM's native **Validation errors** XML export. The GUI bootstrap
+does not install JOSM or Java: it opens `sample.osm` through the Windows `.osm`
+file association, so JOSM must already be installed and associated with `.osm` files.
 
 ```text
 Task Grid + regional PBF

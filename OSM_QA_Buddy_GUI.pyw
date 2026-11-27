@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import threading
@@ -18,30 +17,18 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from osmium_tool import OsmiumToolError, resolve_osmium
+
 REPO_DIR = Path(__file__).resolve().parent
 SESSION_FILE = REPO_DIR / ".gui_session.txt"
 RUNS_DIR = REPO_DIR / "gui_runs"
 
 
 def find_osmium() -> str | None:
-    found = shutil.which("osmium")
-    if found:
-        return found
-    candidates = []
-    conda_prefix = os.environ.get("CONDA_PREFIX")
-    if conda_prefix:
-        candidates.append(Path(conda_prefix) / "Library" / "bin" / "osmium.exe")
-    user = Path(os.environ.get("USERPROFILE", str(Path.home())))
-    candidates.extend(
-        [
-            user / "anaconda3" / "envs" / "qabot" / "Library" / "bin" / "osmium.exe",
-            user / "miniconda3" / "envs" / "qabot" / "Library" / "bin" / "osmium.exe",
-        ]
-    )
-    for path in candidates:
-        if path.is_file():
-            return str(path)
-    return None
+    try:
+        return resolve_osmium()
+    except OsmiumToolError:
+        return None
 
 
 def python_ok() -> bool:
@@ -61,7 +48,6 @@ class QABuddyApp(tk.Tk):
         self.xml_var = tk.StringVar()
         self.output_var = tk.StringVar(value="No run started yet")
         self.status_var = tk.StringVar(value="Ready")
-        self.josm_ready = False
         self.latest_run: dict[str, str] = {}
 
         self._build_style()
@@ -249,7 +235,6 @@ class QABuddyApp(tk.Tk):
         sample = Path(values.get("sample", "")) if values.get("sample") else None
         if sample and sample.is_file():
             self.sample_label.config(text=str(sample))
-            self.josm_ready = True
 
     def _save_session(self, tasks: str, output: str, sample: str) -> None:
         SESSION_FILE.write_text(
@@ -264,14 +249,13 @@ class QABuddyApp(tk.Tk):
         self.dependency_label.config(
             text=(
                 f"{python_text}: {'OK' if python_ok() else 'Too old (need 3.12+)'}\n"
-                f"Osmium: {'Found' if osmium else 'Not found'}\n"
-                f"JOSM: opened through your Windows file association"
+                f"Osmium: {'Found' if osmium else 'Not found'}"
             )
         )
         if not python_ok():
             self.status_var.set("Python 3.12+ is required")
         elif not osmium:
-            self.status_var.set("Ready — Osmium was not detected yet")
+            self.status_var.set("Osmium Tool is missing or could not start")
         else:
             self.status_var.set("Ready")
 
@@ -285,11 +269,31 @@ class QABuddyApp(tk.Tk):
         state = "disabled" if busy else "normal"
         self.open_josm_button.config(state=state)
 
-    def _run_pipeline(self, args: list[str], log_widget: tk.Text, on_success) -> None:
+    def _sync_output_buttons(self) -> None:
+        output = Path(self.latest_run.get("output", ""))
+        self.report_button.config(state="normal" if (output / "report.html").is_file() else "disabled")
+        self.map_button.config(state="normal" if (output / "map.html").is_file() else "disabled")
+
+    def _show_pipeline_failure(self, code: int, log_widget: tk.Text) -> None:
+        self.status_var.set(f"QA run failed (exit code {code})")
+        self._sync_output_buttons()
+        details = log_widget.get("1.0", "end-1c").strip().splitlines()
+        tail = "\n".join(details[-35:]) or "No pipeline output was captured."
+        output = self.latest_run.get("output", "")
+        messagebox.showerror(
+            "QA Buddy finalization failed",
+            f"Pipeline exited with code {code}.\n\n"
+            f"Output folder: {output}\n\n"
+            "The log below shows the most recent diagnostic lines. If report/map files were created before the failure, their buttons remain available.\n\n"
+            f"{tail}",
+        )
+
+    def _run_pipeline(self, args: list[str], log_widget: tk.Text, on_success, on_failure=None) -> None:
         def worker() -> None:
             env = os.environ.copy()
             osmium = find_osmium()
             if osmium:
+                env["OSMIUM_EXE"] = osmium
                 osmium_dir = str(Path(osmium).parent)
                 env["PATH"] = osmium_dir + os.pathsep + env.get("PATH", "")
             env["QABOT_WORK_DIR"] = str(REPO_DIR / "work")
@@ -310,6 +314,8 @@ class QABuddyApp(tk.Tk):
                 code = process.wait()
                 if code == 0:
                     self.after(0, on_success)
+                elif on_failure:
+                    self.after(0, lambda: on_failure(code))
                 else:
                     self.after(0, lambda: messagebox.showerror("QA Buddy", f"Pipeline failed with exit code {code}."))
             except Exception as exc:
@@ -332,12 +338,12 @@ class QABuddyApp(tk.Tk):
         if not tasks or not Path(tasks).is_file():
             messagebox.showwarning("Input required", "Please select a valid Task Grid GeoJSON file.")
             return
-        if not find_osmium():
-            messagebox.showerror(
-                "Osmium not found",
-                "Osmium was not detected. Install it in the active environment or add osmium.exe to PATH.",
-            )
+        try:
+            resolve_osmium()
+        except OsmiumToolError as exc:
+            messagebox.showerror("Osmium Tool unavailable", str(exc))
             return
+
 
         output = RUNS_DIR / datetime.now().strftime("%Y%m%d_%H%M%S")
         output.mkdir(parents=True, exist_ok=True)
@@ -348,7 +354,6 @@ class QABuddyApp(tk.Tk):
             sample = output / "sample.osm"
             self._save_session(tasks, str(output), str(sample))
             self.sample_label.config(text=str(sample))
-            self.josm_ready = True
             self.status_var.set("Prepared — ready for JOSM validation")
             self.notebook.select(1)
             messagebox.showinfo("Ready for JOSM", "The sample is ready. Run JOSM Validator with Shift+V, then save the validation results as XML.")
@@ -361,10 +366,14 @@ class QABuddyApp(tk.Tk):
             messagebox.showwarning("No sample", "Start a new QA run first.")
             return
         try:
-            os.startfile(str(sample))  # type: ignore[attr-defined]
-            self.status_var.set("Opened sample.osm — validate it in JOSM")
+            os.startfile(str(sample))
+            self.status_var.set("Opened sample.osm with the Windows default application")
         except OSError as exc:
-            messagebox.showerror("Could not open sample", str(exc))
+            messagebox.showerror(
+                "Could not open sample.osm",
+                "Windows could not open this file. Set .osm files to open with your installed JOSM, then try again.\n\n"
+                f"{exc}",
+            )
 
     def start_finalize(self) -> None:
         tasks = self.latest_run.get("tasks", "")
@@ -384,22 +393,33 @@ class QABuddyApp(tk.Tk):
 
         def success() -> None:
             self.status_var.set("QA run complete")
-            self.report_button.config(state="normal")
-            self.map_button.config(state="normal")
+            self._sync_output_buttons()
             self.notebook.select(2)
-            messagebox.showinfo("QA run complete", "QA Buddy finished successfully. The report and map are ready.")
+            available = []
+            if (Path(output) / "report.html").is_file():
+                available.append("report")
+            if (Path(output) / "map.html").is_file():
+                available.append("map")
+            messagebox.showinfo("QA run complete", "QA Buddy finished successfully. Available outputs: " + (", ".join(available) or "none"))
 
-        self._run_pipeline(["finalize", tasks, xml, output], self.finalize_log, success)
+        def failure(code: int) -> None:
+            self._show_pipeline_failure(code, self.finalize_log)
+
+        self._run_pipeline(["finalize", tasks, xml, output], self.finalize_log, success, failure)
 
     def open_report(self) -> None:
         path = Path(self.latest_run.get("output", "")) / "report.html"
         if path.is_file():
             webbrowser.open(path.as_uri())
+        else:
+            messagebox.showwarning("Report unavailable", f"The report was not created in the run folder:\n{path.parent}")
 
     def open_map(self) -> None:
         path = Path(self.latest_run.get("output", "")) / "map.html"
         if path.is_file():
             webbrowser.open(path.as_uri())
+        else:
+            messagebox.showwarning("Map unavailable", f"The map was not created in the run folder:\n{path.parent}")
 
 
 if __name__ == "__main__":

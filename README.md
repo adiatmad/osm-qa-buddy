@@ -49,7 +49,7 @@ You do **not** need to install Python, Java, Osmium Tool, Conda, or JOSM yoursel
 
 The runtime is kept in `.qabot-runtime\` inside this checkout. It does not modify your global Python installation or Windows PATH and does not require administrator access. Keep the repository folder in place after setup.
 
-**First launch requires an internet connection and several hundred MB of free disk space.** Downloads are verified before installers/components are used. If setup fails, the PowerShell window stays open with the error; correct the issue and click the VBS again.
+**First launch requires an internet connection and several hundred MB of free disk space.** The Miniforge installer is SHA-256 verified; the JOSM download is checked as a readable JOSM application archive. If setup fails, the PowerShell window stays open with the error; correct the issue and click the VBS again.
 
 You do not need Git after downloading the repository as a ZIP. Git is only needed if you want to clone or update the source.
 

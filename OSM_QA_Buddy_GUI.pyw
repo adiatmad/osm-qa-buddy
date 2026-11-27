@@ -269,7 +269,26 @@ class QABuddyApp(tk.Tk):
         state = "disabled" if busy else "normal"
         self.open_josm_button.config(state=state)
 
-    def _run_pipeline(self, args: list[str], log_widget: tk.Text, on_success) -> None:
+    def _sync_output_buttons(self) -> None:
+        output = Path(self.latest_run.get("output", ""))
+        self.report_button.config(state="normal" if (output / "report.html").is_file() else "disabled")
+        self.map_button.config(state="normal" if (output / "map.html").is_file() else "disabled")
+
+    def _show_pipeline_failure(self, code: int, log_widget: tk.Text) -> None:
+        self.status_var.set(f"QA run failed (exit code {code})")
+        self._sync_output_buttons()
+        details = log_widget.get("1.0", "end-1c").strip().splitlines()
+        tail = "\\n".join(details[-35:]) or "No pipeline output was captured."
+        output = self.latest_run.get("output", "")
+        messagebox.showerror(
+            "QA Buddy finalization failed",
+            f"Pipeline exited with code {code}.\\n\\n"
+            f"Output folder: {output}\\n\\n"
+            "The log below shows the most recent diagnostic lines. If report/map files were created before the failure, their buttons remain available.\\n\\n"
+            f"{tail}",
+        )
+
+    def _run_pipeline(self, args: list[str], log_widget: tk.Text, on_success, on_failure=None) -> None:
         def worker() -> None:
             env = os.environ.copy()
             osmium = find_osmium()
@@ -295,6 +314,8 @@ class QABuddyApp(tk.Tk):
                 code = process.wait()
                 if code == 0:
                     self.after(0, on_success)
+                elif on_failure:
+                    self.after(0, lambda: on_failure(code))
                 else:
                     self.after(0, lambda: messagebox.showerror("QA Buddy", f"Pipeline failed with exit code {code}."))
             except Exception as exc:
@@ -372,22 +393,33 @@ class QABuddyApp(tk.Tk):
 
         def success() -> None:
             self.status_var.set("QA run complete")
-            self.report_button.config(state="normal")
-            self.map_button.config(state="normal")
+            self._sync_output_buttons()
             self.notebook.select(2)
-            messagebox.showinfo("QA run complete", "QA Buddy finished successfully. The report and map are ready.")
+            available = []
+            if (Path(output) / "report.html").is_file():
+                available.append("report")
+            if (Path(output) / "map.html").is_file():
+                available.append("map")
+            messagebox.showinfo("QA run complete", "QA Buddy finished successfully. Available outputs: " + (", ".join(available) or "none"))
 
-        self._run_pipeline(["finalize", tasks, xml, output], self.finalize_log, success)
+        def failure(code: int) -> None:
+            self._show_pipeline_failure(code, self.finalize_log)
+
+        self._run_pipeline(["finalize", tasks, xml, output], self.finalize_log, success, failure)
 
     def open_report(self) -> None:
         path = Path(self.latest_run.get("output", "")) / "report.html"
         if path.is_file():
             webbrowser.open(path.as_uri())
+        else:
+            messagebox.showwarning("Report unavailable", f"The report was not created in the run folder:\\n{path.parent}")
 
     def open_map(self) -> None:
         path = Path(self.latest_run.get("output", "")) / "map.html"
         if path.is_file():
             webbrowser.open(path.as_uri())
+        else:
+            messagebox.showwarning("Map unavailable", f"The map was not created in the run folder:\\n{path.parent}")
 
 
 if __name__ == "__main__":

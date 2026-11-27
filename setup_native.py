@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import shutil
 import subprocess
@@ -72,6 +73,14 @@ def ensure_python_dependencies():
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Prepare OSM QA Buddy native dependencies.")
+    parser.add_argument(
+        "--gui-only",
+        action="store_true",
+        help="Prepare the verified JOSM GUI runtime without downloading the legacy Jython component.",
+    )
+    args = parser.parse_args()
+
     print("OSM QA Buddy — native Windows setup")
     print("====================================")
     if sys.version_info < (3, 12):
@@ -87,8 +96,11 @@ def main():
     print((java.stderr or java.stdout).splitlines()[0] if (java.stderr or java.stdout) else "Java detected")
     print(f"Osmium Tool: {osmium_path} (verified with --version)")
     download(JOSM_URL, TOOLS_DIR / f"josm-{JOSM_VERSION}.jar", JOSM_SHA256)
-    download(JYTHON_URL, TOOLS_DIR / f"jython-{JYTHON_VERSION}.jar")
-    print(f"\nReady. JOSM {JOSM_VERSION} and Jython {JYTHON_VERSION} are prepared in {TOOLS_DIR}.")
+    if not args.gui_only:
+        download(JYTHON_URL, TOOLS_DIR / f"jython-{JYTHON_VERSION}.jar")
+    print(f"\nReady. JOSM {JOSM_VERSION} is prepared in {TOOLS_DIR}.")
+    if not args.gui_only:
+        print(f"Jython {JYTHON_VERSION} is also prepared in {TOOLS_DIR}.")
 
 
 if __name__ == "__main__":

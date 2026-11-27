@@ -2,11 +2,11 @@
 
 ## Goal
 
-A Windows user can double-click `Launch_OSM_QA_Buddy.vbs` on a fresh machine and reach a ready OSM QA Buddy GUI without manually installing Python, Java, Osmium Tool, Conda, or JOSM.
+A Windows user with JOSM already installed can double-click `Launch_OSM_QA_Buddy.vbs` from an extracted repository ZIP on a fresh machine and reach a ready OSM QA Buddy GUI without manually installing Python, Java, Osmium Tool, or Conda.
 
 ## Problem
 
-The previous VBS launcher only searched PATH for `pythonw.exe` and failed when Python was absent. Even when Python existed, the GUI could open without Shapely, Osmium Tool, Java, or a prepared JOSM runtime. That is not a complete first-run experience.
+The previous VBS launcher only searched PATH for `pythonw.exe` and failed when Python was absent. Even when Python existed, the GUI could open without Shapely or Osmium Tool. The GUI bridge already uses the user's installed JOSM through Windows file association; bundling another JOSM and Java runtime is unnecessary. That is not a complete first-run experience.
 
 ## Requirements
 
@@ -16,11 +16,11 @@ The VBS launcher must invoke a visible PowerShell bootstrap script. It must not 
 
 ### R2 — Private, reproducible runtime
 
-Install Miniforge per-user and create a repository-local Conda environment under `.qabot-runtime\` containing Python 3.12 with Tkinter, Shapely 2.1.2, Osmium Tool CLI, and OpenJDK 21. Do not register Python globally, modify user/machine PATH, or require administrator privileges.
+Install Miniforge per-user and create a repository-local Conda environment under `.qabot-runtime\` containing Python 3.12 with Tkinter, Shapely 2.1.2, and Osmium Tool CLI. Do not register Python globally, modify user/machine PATH, or require administrator privileges.
 
 ### R3 — Verify installers and dependencies
 
-Obtain the official Miniforge Windows x86-64 release asset and verify its GitHub-provided SHA-256 digest before execution. Verify Python/Shapely imports, `osmium.exe --version`, and `java.exe -version` before launching the GUI. Fail closed with a visible actionable error.
+Obtain the official Miniforge Windows x86-64 release asset and verify its GitHub-provided SHA-256 digest before execution. Verify Python/Tkinter/Shapely imports and `osmium.exe --version` before launching the GUI. Fail closed with a visible actionable error.
 
 ### R4 — Prepare JOSM for the GUI workflow
 
@@ -40,9 +40,9 @@ Show setup output in a visible PowerShell window. Do not launch a partially conf
 
 ## Acceptance Criteria
 
-- A clean Windows machine with PowerShell and internet access but without Python, Java, Osmium Tool, Conda, or JOSM can launch the VBS and reach the GUI.
-- The runtime contains Python 3.12 with Tkinter, Shapely 2.1.2, a working `osmium.exe`, and Java 21.
-- JOSM 19613 is downloaded and checksum-verified, and the GUI opens prepared samples directly in that JOSM JAR.
+- A clean Windows machine with PowerShell and internet access but without Python, Java, Osmium Tool, or Conda, but with JOSM installed and `.osm` files associated with it, can launch the VBS and reach the GUI.
+- The runtime contains Python 3.12 with Tkinter, Shapely 2.1.2, and a working `osmium.exe`; it does not install Java.
+- The GUI opens prepared samples using the user's installed JOSM through the Windows `.osm` file association; no JOSM or Java download occurs.
 - A second launch reuses the environment and does not reinstall healthy packages.
 - Removing a required package causes a repair before the GUI opens.
 - Failed downloads, checksum mismatch, failed package installation, or failed dependency probes prevent GUI launch and show a useful error.

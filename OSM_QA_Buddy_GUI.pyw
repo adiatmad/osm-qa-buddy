@@ -249,7 +249,7 @@ class QABuddyApp(tk.Tk):
         self.dependency_label.config(
             text=(
                 f"{python_text}: {'OK' if python_ok() else 'Too old (need 3.12+)'}\n"
-                f"Osmium: {'Found' if osmium else 'Not found'}\n"
+                f"Osmium: {'Found' if osmium else 'Not found'}"
             )
         )
         if not python_ok():

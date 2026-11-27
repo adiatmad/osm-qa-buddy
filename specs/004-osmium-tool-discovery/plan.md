@@ -1,26 +1,28 @@
-# Plan: Reliable Osmium Tool Discovery
+# Plan: One-click Windows Runtime Bootstrap
 
 ## Technical approach
 
-1. Add osmium_tool.py as the sole resolver and verification boundary.
-2. Keep discovery deterministic and bounded: inspect PATH, active prefixes, CONDA_ENVS_PATH, the per-user .conda/environments.txt registry, and known per-user Conda installation roots; do not recursively scan the entire disk.
-3. Treat OSMIUM_EXE as an explicit override and verify every candidate by executing --version.
-4. Update the GUI, batch launcher, setup script, and orchestrator to consume the resolver. Pass the absolute executable path to pipeline subprocesses and prepend its directory to the child PATH where the launcher owns the environment.
-5. Document Conda discovery and the override without adding automatic downloads, installers, or PATH mutation.
-6. Add standard-library unit tests and a CI step for discovery, precedence, and failure cases.
+1. Replace the Python-dependent VBS launcher with a visible PowerShell bootstrap entry point.
+2. Download the official Miniforge Windows x86-64 installer from its GitHub release metadata; verify the asset's SHA-256 digest before running the silent per-user installer.
+3. Install a private Conda environment in `.qabot-runtime\env` with Python 3.12, pinned Shapely 2.1.2, `osmium-tool`, and OpenJDK 21 from conda-forge.
+4. Verify the Python/Shapely import, `osmium.exe --version`, and Java before proceeding. Reuse a healthy environment and repair an unhealthy one.
+5. Run the existing setup code in GUI-only mode to checksum-verify the pinned JOSM JAR without downloading unused Jython.
+6. Launch the GUI with the private environment's `pythonw.exe` and inherited environment. Pass `OSMIUM_EXE` and the runtime PATH into child processes.
+7. Launch sample OSM data directly with the bundled JOSM JAR instead of relying on Windows file associations.
+8. Ignore the local runtime and update README/spec/CI to match the actual user workflow.
 
 ## Validation strategy
 
-- Run python -m unittest test_osmium_tool.py.
-- Run the repository CI test commands and Python syntax checks.
-- Inspect all Osmium subprocess call sites to confirm none invoke a bare osmium command.
-- On Windows, manually launch the VBS from Explorer with Osmium installed only in an inactive Conda environment; confirm the GUI reports the resolved executable and completes preflight.
-- Confirm the batch launcher and native setup resolve the same executable.
-- Windows Explorer/Conda integration is a manual acceptance item; Linux CI only verifies the resolver logic using mocked executable probes.
+- Run Python syntax checks and all repository regression tests.
+- Parse `bootstrap.ps1` with the Windows PowerShell parser in CI.
+- Inspect the VBS and bootstrap scripts for global PATH/registry mutation and ensure the GUI starts only after all probes pass.
+- On Windows, test the actual VBS from a checkout with no Python/Java/Osmium/JOSM installed; verify first install, GUI startup, JOSM sample opening, and second-launch reuse.
+- Simulate an incomplete environment and verify repair; simulate a failed dependency probe and verify that the GUI is not launched.
+- Manual Windows first-run acceptance remains mandatory; Linux CI cannot prove Windows installer behavior.
 
 ## Risks and mitigations
 
-- Stale explicit override: fail closed and explain how to correct or remove it.
-- Broken/incomplete Osmium distribution: execute --version before declaring it ready and report DLL/startup errors.
-- Slow or unbounded search: search only known roots and one level of Conda environments.
-- Different environments across launchers: pass the verified absolute path through OSMIUM_EXE and subprocess arguments.
+- GitHub release API may omit the installer digest: fail closed rather than execute an unverified installer.
+- Conda-forge/network access may be blocked: keep the visible diagnostic and allow retry after connectivity is restored.
+- Partial installer/runtime state: distinguish a missing environment from an incomplete Miniforge root and provide a safe recovery instruction.
+- Java/JOSM process behavior differs on Windows: verify through the real VBS/JOSM manual acceptance test.

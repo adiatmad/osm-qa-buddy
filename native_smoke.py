@@ -7,6 +7,8 @@ def test_native_runner_shape():
     preflight = Path("preflight.py").read_text(encoding="utf-8")
     setup = Path("setup_native.py").read_text(encoding="utf-8")
     bot = Path("bot.py").read_text(encoding="utf-8")
+    bootstrap = Path("bootstrap.ps1").read_text(encoding="utf-8").lower()
+    gui = Path("OSM_QA_Buddy_GUI.pyw").read_text(encoding="utf-8")
     assert "_native_worker" in app
     assert "--ram-gb" in app
     assert "--project-id" in app
@@ -29,6 +31,10 @@ def test_native_runner_shape():
     assert "josm-tested.jar" in setup
     assert "is_valid_josm_jar" in setup
     assert "josm-tested.jar" in orchestrator
+    assert "openjdk=21" not in bootstrap
+    assert "setup_native.py" not in bootstrap
+    assert "josm-tested.jar" not in gui
+    assert "os.startfile(str(sample))" in gui
     assert "find_mapcss_files" in bot
     assert "hot_rules_dir" in bot
     assert "external_rules_dir" in bot

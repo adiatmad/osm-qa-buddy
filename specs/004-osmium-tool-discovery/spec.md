@@ -1,61 +1,58 @@
-# Specification: Reliable Osmium Tool Discovery
+# Specification: One-click Windows Runtime Bootstrap
 
 ## Goal
 
-Make every supported Windows QA Buddy entry point find and verify the same Osmium Tool executable without depending on the launching shell's Conda activation state or a hardcoded environment name.
+A Windows user can double-click `Launch_OSM_QA_Buddy.vbs` on a fresh machine and reach a ready OSM QA Buddy GUI without manually installing Python, Java, Osmium Tool, Conda, or JOSM.
 
 ## Problem
 
-Osmium discovery is duplicated and inconsistent across the GUI, batch launcher, native setup, and pipeline. The GUI searches PATH, CONDA_PREFIX, and two hardcoded environment paths; the batch launcher has a separate copy; setup and the native orchestrator only use PATH. Launching the VBS from Explorer does not activate a Conda environment, so an installed Osmium executable can be reported as missing.
-
-The Python package named osmium (pyosmium) is not the Osmium Tool command-line executable.
+The previous VBS launcher only searched PATH for `pythonw.exe` and failed when Python was absent. Even when Python existed, the GUI could open without Shapely, Osmium Tool, Java, or a prepared JOSM runtime. That is not a complete first-run experience.
 
 ## Requirements
 
-### R1 — One discovery implementation
+### R1 — One-click bootstrap
 
-All GUI, batch, setup, and native pipeline paths must use one shared resolver. Remove duplicated hardcoded environment checks.
+The VBS launcher must invoke a visible PowerShell bootstrap script. It must not require Python to exist before setup begins.
 
-### R2 — Supported discovery locations
+### R2 — Private, reproducible runtime
 
-Resolve Osmium Tool in this order:
-1. Explicit OSMIUM_EXE override.
-2. Executable available on PATH.
-3. Active CONDA_PREFIX and current Python environment.
-4. Conda environment directories from CONDA_ENVS_PATH and the per-user Conda environments registry.
-5. Common per-user Miniforge, Mambaforge, Miniconda, and Anaconda installation roots.
+Install Miniforge per-user and create a repository-local Conda environment under `.qabot-runtime\` containing Python 3.12, Shapely 2.1.2, Osmium Tool CLI, and OpenJDK 21. Do not register Python globally, modify user/machine PATH, or require administrator privileges.
 
-An explicit override is authoritative: if it is set but invalid, report the problem rather than silently selecting another binary.
+### R3 — Verify installers and dependencies
 
-### R3 — Verify the executable
+Obtain the official Miniforge Windows x86-64 release asset and verify its GitHub-provided SHA-256 digest before execution. Verify Python/Shapely imports, `osmium.exe --version`, and `java.exe -version` before launching the GUI. Fail closed with a visible actionable error.
 
-A candidate is valid only when it is a file and osmium.exe --version exits successfully with version output. Distinguish missing executables from found-but-unusable executables and provide actionable diagnostics.
+### R4 — Prepare JOSM for the GUI workflow
 
-### R4 — Use the resolved executable consistently
+Download the repository-pinned JOSM JAR through the existing checksum-verifying setup code. The GUI must launch that JOSM JAR directly; it must not depend on a separately installed JOSM or Windows file association. The GUI bootstrap must not download the legacy Jython component that is not needed for the GUI bridge.
 
-Pass the resolved absolute executable path to every Osmium subprocess call. Ensure the executable directory is available on PATH for Windows DLL resolution and child processes where the GUI/batch launcher starts the pipeline.
+### R5 — Repair and reuse
 
-### R5 — No implicit machine mutation
+Subsequent VBS launches must reuse a healthy runtime. If the environment is incomplete or a required command fails verification, use Conda to repair the existing environment before opening the GUI.
 
-Do not download or install Osmium automatically and do not edit system PATH. Support a documented user-level OSMIUM_EXE override for nonstandard installations.
+### R6 — Keep machine state untouched
 
-### R6 — Regression coverage
+All runtime files live under the checkout's ignored `.qabot-runtime\` directory. No global Python/Java install, global/user PATH mutation, registry registration, or admin elevation.
 
-Test PATH discovery, active Conda discovery, Conda environment-root discovery, explicit override behavior, missing executable, and broken version probe. Run the tests in CI.
+### R7 — Failure behavior
+
+Show setup output in a visible PowerShell window. Do not launch a partially configured GUI. Keep the failure window open long enough for the user to read the error.
 
 ## Acceptance Criteria
 
-- Launching QA Buddy without an activated Conda shell can discover Osmium in a supported Conda/Miniforge environment.
-- GUI, batch, setup, and orchestrator all call the shared resolver.
-- Pipeline subprocesses use the verified absolute executable, not a bare osmium command.
-- A missing executable and a broken executable produce different actionable errors.
-- A configured invalid OSMIUM_EXE fails closed.
-- CI runs focused Osmium resolver tests.
-- Existing JOSM validation behavior and human-review workflow remain unchanged.
+- A clean Windows machine with PowerShell and internet access but without Python, Java, Osmium Tool, Conda, or JOSM can launch the VBS and reach the GUI.
+- The runtime contains Python 3.12, Shapely, a working `osmium.exe`, and Java.
+- JOSM 19613 is downloaded and checksum-verified, and the GUI opens prepared samples directly in that JOSM JAR.
+- A second launch reuses the environment and does not reinstall healthy packages.
+- Removing a required package causes a repair before the GUI opens.
+- Failed downloads, checksum mismatch, failed package installation, or failed dependency probes prevent GUI launch and show a useful error.
+- The bootstrap does not modify global/user PATH or register Python.
+- CI parses the PowerShell bootstrap and continues to run Python regression tests.
+- Existing QA pipeline behavior and human review in JOSM remain unchanged.
 
 ## Non-Goals
 
-- Installing or updating Osmium automatically.
-- Bundling Osmium binaries or DLLs into the repository.
-- Changing Osmium extraction semantics or JOSM validation behavior.
-- Modifying global or user PATH automatically.
+- Installing Git or downloading the repository itself.
+- Installing global software or changing Windows associations.
+- Automatically running validation or making QA decisions on behalf of the human reviewer.
+- Bundling large third-party binaries in Git.

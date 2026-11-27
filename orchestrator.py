@@ -17,7 +17,7 @@ from report import generate_report
 from osmium_tool import OsmiumToolError, resolve_osmium
 
 QA_BUDDY_VERSION = "0.1.0"
-JOSM_VERSION = "19613"
+JOSM_VERSION = "tested"
 JYTHON_VERSION = "2.7.3"
 HOT_RULES_URL = "https://josm.openstreetmap.de/josmfile?page=Rules/ValidatingBuildingsInHOTTMProjects&zip=1"
 THIRD_PASS_RULE_SOURCES = {
@@ -34,7 +34,7 @@ THIRD_PASS_RULE_SOURCES = {
 }
 REPO_DIR = Path(__file__).resolve().parent
 TOOLS_DIR = REPO_DIR / "tools"
-JOSM_JAR = TOOLS_DIR / f"josm-{JOSM_VERSION}.jar"
+JOSM_JAR = TOOLS_DIR / "josm-tested.jar"
 JYTHON_JAR = TOOLS_DIR / f"jython-{JYTHON_VERSION}.jar"
 WORK_DIR = os.environ.get("QABOT_WORK_DIR", str(REPO_DIR / "work"))
 

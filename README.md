@@ -66,7 +66,7 @@ After the GUI opens:
 5. In JOSM, run Validator with **Shift+V**, review the findings, select the **Validation errors** layer, and use **File → Save As** to save the results as XML.
 6. Return to QA Buddy, open the **Finalize** tab, select the XML file, and click **Finalize QA Run**.
 
-QA Buddy then produces the task-level results, map, and report.
+QA Buddy then produces the task-level results, map, and report. The GUI stores each run in a timestamped folder under `gui_runs\\` inside the repository. The GUI shows the active output folder and provides buttons to open the generated report and map.
 
 The project boundary is not a separate input for this bridge; the Task Grid is the authoritative extraction geometry.
 
@@ -95,6 +95,8 @@ Other useful outputs include:
 | `validation_errors.xml` | Native JOSM validation export |
 | `sample.osm` | The clipped OSM data checked by JOSM |
 | `run_metadata.json` | Information needed to reproduce/debug the run |
+
+The files are written to the current run folder (shown in the GUI), not directly to the repository root.
 
 ---
 
@@ -149,7 +151,7 @@ This is real field-validation evidence for the workflow, **not a guarantee that 
 
 # Existing native/headless workflow
 
-QA Buddy also has an older automated workflow. It remains useful as a regression/development baseline.
+QA Buddy also retains a separate automated/headless workflow, mainly as a regression and development path. It is not the recommended first-run workflow for people who want to validate interactively in JOSM.
 
 Start it with:
 
@@ -157,9 +159,9 @@ Start it with:
 run_qa.bat
 ```
 
-That workflow prepares the data and runs JOSM through its existing automated/headless path.
+Unlike the GUI bridge, this path has additional native prerequisites: a compatible Java runtime, the JOSM and Jython components prepared by `setup_native.py`, and a working Osmium Tool installation. The private `.qabot-runtime\\` bootstrap is for the GUI bridge; it does not install Java or prepare the headless JOSM/Jython toolchain.
 
-For new users who want to use the normal JOSM Validator, prefer the **GUI Validation Bridge** described above.
+For normal interactive validation with the JOSM installation already on your computer, use the **GUI Validation Bridge** described above.
 
 ---
 
@@ -205,6 +207,10 @@ sample.osm.ready.json
 
 Check that JOSM actually saved the **Validation errors** layer as XML and that the path in your `finalize` command points to that file. The XML filename and folder can be anything; the path just needs to point to the file you saved.
 
+### Finalize fails or the Report/Map buttons are unavailable
+
+The GUI now displays the pipeline exit code and recent log lines when finalization fails. Check those diagnostics first. Report and Map buttons are enabled only when their corresponding HTML files exist; if a failure happens after one output was generated, that output remains available. The run folder is shown in the GUI, and you can inspect it directly under `gui_runs\\`.
+
 ### There are many findings
 
 That is not automatically a failure. QA Buddy reports what JOSM found. Review the findings before deciding whether anything needs fixing.
@@ -214,6 +220,18 @@ That is not automatically a failure. QA Buddy reports what JOSM found. Review th
 That is expected in some datasets. QA Buddy keeps them instead of guessing which task they belong to.
 
 ---
+
+# Optional: export review candidates for BetterWorkspace
+
+After a QA run, you can export candidate OSM ways from `qa_errors.geojson` into a separate JOSM-compatible OSM layer for BetterWorkspace's existing multi-validation workflow. This is an optional hand-off, not an automatic validation or upload step.
+
+Run from the repository folder with the same Python environment used by QA Buddy:
+
+```cmd
+python betterworkspace_export.py "gui_runs\\YOUR_RUN\\qa_errors.geojson" "gui_runs\\YOUR_RUN\\sample.osm" "gui_runs\\YOUR_RUN\\betterworkspace_candidates.osm" --task-grid "C:\\data\\task_grid.geojson"
+```
+
+The command also writes `betterworkspace_candidates.json` as a sidecar provenance manifest (or use `--manifest` to choose another path). The OSM layer contains copied source ways and their referenced nodes; QA metadata and task attribution stay in the JSON manifest rather than being added as OSM tags. The first implementation exports ways only. Open the candidate layer in JOSM and use BetterWorkspace's existing multi-validation workflow to add the ways to Todo. Human review is still required.
 
 # More documentation
 

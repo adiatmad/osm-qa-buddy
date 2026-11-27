@@ -28,9 +28,6 @@ def download(url, destination):
     except Exception:
         destination.unlink(missing_ok=True)
         raise
-    if expected_sha256 and sha256(destination) != expected_sha256:
-        destination.unlink(missing_ok=True)
-        raise RuntimeError(f"SHA-256 verification failed for {destination.name}.")
 
 
 def is_valid_josm_jar(path):

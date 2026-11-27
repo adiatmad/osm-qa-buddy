@@ -31,21 +31,35 @@ def _candidate_paths():
         if value.strip():
             env_roots.append(Path(os.path.expandvars(value.strip())).expanduser())
 
-    home = Path(os.environ.get("USERPROFILE", str(Path.home())))
-    registry = home / ".conda" / "environments.txt"
-    if registry.is_file():
+    # Do not put Path.home() in dict.get's default: Python evaluates that
+    # default eagerly, even when USERPROFILE is present. Also tolerate a
+    # deliberately minimal environment with no discoverable home directory.
+    home_value = os.environ.get("USERPROFILE") or os.environ.get("HOME")
+    if home_value:
+        home = Path(os.path.expandvars(home_value)).expanduser()
+    else:
         try:
-            active_prefixes.extend(
-                Path(line.strip())
-                for line in registry.read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            )
-        except OSError:
-            pass
-    env_roots.append(home / ".conda" / "envs")
+            home = Path.home()
+        except RuntimeError:
+            home = None
 
     local_app_data = os.environ.get("LOCALAPPDATA")
-    install_roots = [home / name for name in ("miniforge3", "mambaforge", "miniconda3", "anaconda3")]
+    install_roots = []
+    if home is not None:
+        registry = home / ".conda" / "environments.txt"
+        if registry.is_file():
+            try:
+                active_prefixes.extend(
+                    Path(line.strip())
+                    for line in registry.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                )
+            except OSError:
+                pass
+        env_roots.append(home / ".conda" / "envs")
+        install_roots.extend(
+            home / name for name in ("miniforge3", "mambaforge", "miniconda3", "anaconda3")
+        )
     if local_app_data:
         programs = Path(local_app_data) / "Programs"
         install_roots.extend(

@@ -16,7 +16,7 @@ The VBS launcher must invoke a visible PowerShell bootstrap script. It must not 
 
 ### R2 — Private, reproducible runtime
 
-Install Miniforge per-user and create a repository-local Conda environment under `.qabot-runtime\` containing Python 3.12, Shapely 2.1.2, Osmium Tool CLI, and OpenJDK 21. Do not register Python globally, modify user/machine PATH, or require administrator privileges.
+Install Miniforge per-user and create a repository-local Conda environment under `.qabot-runtime\` containing Python 3.12 with Tkinter, Shapely 2.1.2, Osmium Tool CLI, and OpenJDK 21. Do not register Python globally, modify user/machine PATH, or require administrator privileges.
 
 ### R3 — Verify installers and dependencies
 
@@ -41,7 +41,7 @@ Show setup output in a visible PowerShell window. Do not launch a partially conf
 ## Acceptance Criteria
 
 - A clean Windows machine with PowerShell and internet access but without Python, Java, Osmium Tool, Conda, or JOSM can launch the VBS and reach the GUI.
-- The runtime contains Python 3.12, Shapely, a working `osmium.exe`, and Java.
+- The runtime contains Python 3.12 with Tkinter, Shapely 2.1.2, a working `osmium.exe`, and Java 21.
 - JOSM 19613 is downloaded and checksum-verified, and the GUI opens prepared samples directly in that JOSM JAR.
 - A second launch reuses the environment and does not reinstall healthy packages.
 - Removing a required package causes a repair before the GUI opens.

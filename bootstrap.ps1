@@ -65,8 +65,18 @@ function Test-Runtime {
         if ($LASTEXITCODE -ne 0) { return $false }
         & $OsmiumExe --version *> $null
         if ($LASTEXITCODE -ne 0) { return $false }
-        $javaOutput = (& $JavaExe -version 2>&1 | Out-String)
-        if ($LASTEXITCODE -ne 0 -or $javaOutput -notmatch 'version "21\.') { return $false }
+        # java -version writes to stderr. Capture it with Start-Process so
+        # PowerShell's Stop error preference cannot mistake normal stderr for failure.
+        $javaLog = Join-Path $env:TEMP ("qabot-java-version-" + [guid]::NewGuid().ToString("N"))
+        $javaStdout = "$javaLog.out"
+        try {
+            $javaProcess = Start-Process -FilePath $JavaExe -ArgumentList "-version" -Wait -PassThru -NoNewWindow -RedirectStandardOutput $javaStdout -RedirectStandardError $javaLog
+            $javaOutput = (Get-Content -LiteralPath $javaLog -Raw -ErrorAction SilentlyContinue) + (Get-Content -LiteralPath $javaStdout -Raw -ErrorAction SilentlyContinue)
+            if ($javaProcess.ExitCode -ne 0 -or $javaOutput -notmatch 'version "21\.') { return $false }
+        }
+        finally {
+            Remove-Item -LiteralPath $javaLog, $javaStdout -Force -ErrorAction SilentlyContinue
+        }
         return $true
     }
     finally {

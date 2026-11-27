@@ -13,6 +13,7 @@ $JavaExe = Join-Path $EnvPrefix "Library\bin\java.exe"
 $JavawExe = Join-Path $EnvPrefix "Library\bin\javaw.exe"
 $OsmiumExe = Join-Path $EnvPrefix "Library\bin\osmium.exe"
 $JosmJar = Join-Path $RepoRoot "tools\josm-19613.jar"
+$RequirementsFile = Join-Path $RepoRoot "requirements.txt"
 
 function Invoke-Checked {
     param([string]$FilePath, [string[]]$Arguments, [string]$Step)
@@ -60,7 +61,7 @@ function Test-Runtime {
     $oldPath = $env:PATH
     $env:PATH = "$EnvPrefix;$EnvPrefix\Scripts;$EnvPrefix\Library\bin;$EnvPrefix\Library\usr\bin;$oldPath"
     try {
-        & $PythonExe -c "import sys, shapely, tkinter; assert sys.version_info[:2] == (3, 12); assert shapely.__version__ == '2.1.2'"
+        & $PythonExe -c "import sys, shapely, tkinter; print('Python:', sys.version.split()[0]); print('Shapely:', shapely.__version__); print('Tkinter: OK'); sys.exit(0 if sys.version_info[:2] == (3, 12) and shapely.__version__ == '2.1.2' else 1)"
         if ($LASTEXITCODE -ne 0) { return $false }
         & $OsmiumExe --version *> $null
         if ($LASTEXITCODE -ne 0) { return $false }
@@ -95,12 +96,17 @@ try {
         Write-Host "Preparing the private Python, Shapely, Osmium Tool and Java runtime..." -ForegroundColor Cyan
         New-Item -ItemType Directory -Path $RuntimeRoot -Force | Out-Null
         if (Test-Path -LiteralPath (Join-Path $EnvPrefix "conda-meta")) {
-            Invoke-Checked $CondaExe @("install", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "shapely=2.1.2", "tk", "osmium-tool", "openjdk=21") "Runtime repair"
+            Invoke-Checked $CondaExe @("install", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "pip", "tk", "osmium-tool", "openjdk=21") "Runtime repair"
         }
         else {
             Invoke-Checked $CondaExe @("create", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "shapely=2.1.2", "tk", "osmium-tool", "openjdk=21") "Runtime installation"
         }
     }
+
+    # Install the project-pinned Shapely from its official Windows wheel.
+    # The conda-forge Windows build may lag behind the exact version in requirements.txt.
+    Write-Host "Installing and verifying the Python requirements..." -ForegroundColor Cyan
+    Invoke-Checked $PythonExe @("-m", "pip", "install", "--disable-pip-version-check", "--only-binary=:all:", "-r", $RequirementsFile) "Python dependency installation"
 
     $env:CONDA_PREFIX = $EnvPrefix
     $env:OSMIUM_EXE = $OsmiumExe

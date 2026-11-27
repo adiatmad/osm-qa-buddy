@@ -26,7 +26,9 @@ def test_native_runner_shape():
     assert "--project-id" in orchestrator
     assert "project_id=project_id" in orchestrator
     assert "sha256" in orchestrator
-    assert "JOSM_SHA256" in setup
+    assert "josm-tested.jar" in setup
+    assert "is_valid_josm_jar" in setup
+    assert "josm-tested.jar" in orchestrator
     assert "find_mapcss_files" in bot
     assert "hot_rules_dir" in bot
     assert "external_rules_dir" in bot

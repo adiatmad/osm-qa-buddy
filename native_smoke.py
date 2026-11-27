@@ -23,7 +23,7 @@ def test_native_runner_shape():
     assert "sample.osm.ready.json" in orchestrator
     assert "org.python.util.jython" in orchestrator
     assert "os.pathsep" in orchestrator
-    assert 'JOSM_VERSION = "19613"' in orchestrator
+    assert 'JOSM_VERSION = "tested"' in orchestrator
     assert 'JYTHON_VERSION = "2.7.3"' in orchestrator
     assert "--project-id" in orchestrator
     assert "project_id=project_id" in orchestrator

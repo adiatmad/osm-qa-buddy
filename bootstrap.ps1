@@ -12,7 +12,7 @@ $PythonwExe = Join-Path $EnvPrefix "pythonw.exe"
 $JavaExe = Join-Path $EnvPrefix "Library\bin\java.exe"
 $JavawExe = Join-Path $EnvPrefix "Library\bin\javaw.exe"
 $OsmiumExe = Join-Path $EnvPrefix "Library\bin\osmium.exe"
-$JosmJar = Join-Path $RepoRoot "tools\josm-19613.jar"
+$JosmJar = Join-Path $RepoRoot "tools\josm-tested.jar"
 $RequirementsFile = Join-Path $RepoRoot "requirements.txt"
 
 function Invoke-Checked {

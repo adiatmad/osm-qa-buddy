@@ -9,6 +9,8 @@ $Installer = Join-Path $env:TEMP "Miniforge3-Windows-x86_64.exe"
 $CondaExe = Join-Path $CondaRoot "Scripts\conda.exe"
 $PythonExe = Join-Path $EnvPrefix "python.exe"
 $PythonwExe = Join-Path $EnvPrefix "pythonw.exe"
+$JavaExe = Join-Path $EnvPrefix "Library\bin\java.exe"
+$JavawExe = Join-Path $EnvPrefix "Library\bin\javaw.exe"
 $OsmiumExe = Join-Path $EnvPrefix "Library\bin\osmium.exe"
 $JosmJar = Join-Path $RepoRoot "tools\josm-19613.jar"
 
@@ -24,13 +26,14 @@ function Install-Miniforge {
     Write-Host "Downloading the official Miniforge Windows installer..." -ForegroundColor Cyan
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/conda-forge/miniforge/releases/latest" -Headers @{ "Accept" = "application/vnd.github+json" }
     $asset = $release.assets | Where-Object { $_.name -eq "Miniforge3-Windows-x86_64.exe" } | Select-Object -First 1
-    if (-not $asset -or $asset.digest -notmatch "^sha256:([0-9a-fA-F]{64})$") {
+    $digestMatch = [regex]::Match([string]$asset.digest, "^sha256:([0-9a-fA-F]{64})$")
+    if (-not $asset -or -not $digestMatch.Success) {
         throw "GitHub did not provide a SHA-256 digest for the Miniforge installer. Refusing to run an unverified installer."
     }
+    $expectedHash = $digestMatch.Groups[1].Value.ToLowerInvariant()
 
     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $Installer -UseBasicParsing
     $actualHash = (Get-FileHash -Path $Installer -Algorithm SHA256).Hash.ToLowerInvariant()
-    $expectedHash = $Matches[1].ToLowerInvariant()
     if ($actualHash -ne $expectedHash) {
         Remove-Item -LiteralPath $Installer -Force -ErrorAction SilentlyContinue
         throw "Miniforge installer SHA-256 verification failed. The installer was not executed."
@@ -47,20 +50,22 @@ function Install-Miniforge {
 
 function Test-Runtime {
     if (-not (Test-Path -LiteralPath $PythonExe) -or
+        -not (Test-Path -LiteralPath $PythonwExe) -or
         -not (Test-Path -LiteralPath $OsmiumExe) -or
-        -not (Test-Path -LiteralPath (Join-Path $EnvPrefix "Library\bin\java.exe"))) {
+        -not (Test-Path -LiteralPath $JavaExe) -or
+        -not (Test-Path -LiteralPath $JavawExe)) {
         return $false
     }
 
     $oldPath = $env:PATH
     $env:PATH = "$EnvPrefix;$EnvPrefix\Scripts;$EnvPrefix\Library\bin;$EnvPrefix\Library\usr\bin;$oldPath"
     try {
-        & $PythonExe -c "import sys, shapely; assert sys.version_info >= (3, 12); print('Python', sys.version.split()[0], '| Shapely', shapely.__version__)" *> $null
+        & $PythonExe -c "import sys, shapely; assert sys.version_info[:2] == (3, 12); assert shapely.__version__ == '2.1.2'"
         if ($LASTEXITCODE -ne 0) { return $false }
         & $OsmiumExe --version *> $null
         if ($LASTEXITCODE -ne 0) { return $false }
-        & (Join-Path $EnvPrefix "Library\bin\java.exe") -version *> $null
-        if ($LASTEXITCODE -ne 0) { return $false }
+        $javaOutput = (& $JavaExe -version 2>&1 | Out-String)
+        if ($LASTEXITCODE -ne 0 -or $javaOutput -notmatch 'version "21\.') { return $false }
         return $true
     }
     finally {

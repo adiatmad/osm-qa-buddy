@@ -36,3 +36,24 @@ jobs:
         run: python3 native_smoke.py
       - name: Build Docker image
         run: docker build -t qabot .
+
+  windows-launcher:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell bootstrap
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD "bootstrap.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+      - name: Check Python syntax on Windows
+        run: python -m py_compile setup_native.py osmium_tool.py OSM_QA_Buddy_GUI.pyw

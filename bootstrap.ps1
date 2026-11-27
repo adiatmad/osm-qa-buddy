@@ -9,10 +9,7 @@ $Installer = Join-Path $env:TEMP "Miniforge3-Windows-x86_64.exe"
 $CondaExe = Join-Path $CondaRoot "Scripts\conda.exe"
 $PythonExe = Join-Path $EnvPrefix "python.exe"
 $PythonwExe = Join-Path $EnvPrefix "pythonw.exe"
-$JavaExe = Join-Path $EnvPrefix "Library\bin\java.exe"
-$JavawExe = Join-Path $EnvPrefix "Library\bin\javaw.exe"
 $OsmiumExe = Join-Path $EnvPrefix "Library\bin\osmium.exe"
-$JosmJar = Join-Path $RepoRoot "tools\josm-tested.jar"
 $RequirementsFile = Join-Path $RepoRoot "requirements.txt"
 
 function Invoke-Checked {
@@ -52,9 +49,7 @@ function Install-Miniforge {
 function Test-Runtime {
     if (-not (Test-Path -LiteralPath $PythonExe) -or
         -not (Test-Path -LiteralPath $PythonwExe) -or
-        -not (Test-Path -LiteralPath $OsmiumExe) -or
-        -not (Test-Path -LiteralPath $JavaExe) -or
-        -not (Test-Path -LiteralPath $JavawExe)) {
+        -not (Test-Path -LiteralPath $OsmiumExe)) {
         return $false
     }
 
@@ -65,18 +60,6 @@ function Test-Runtime {
         if ($LASTEXITCODE -ne 0) { return $false }
         & $OsmiumExe --version *> $null
         if ($LASTEXITCODE -ne 0) { return $false }
-        # java -version writes to stderr. Capture it with Start-Process so
-        # PowerShell's Stop error preference cannot mistake normal stderr for failure.
-        $javaLog = Join-Path $env:TEMP ("qabot-java-version-" + [guid]::NewGuid().ToString("N"))
-        $javaStdout = "$javaLog.out"
-        try {
-            $javaProcess = Start-Process -FilePath $JavaExe -ArgumentList "-version" -Wait -PassThru -NoNewWindow -RedirectStandardOutput $javaStdout -RedirectStandardError $javaLog
-            $javaOutput = (Get-Content -LiteralPath $javaLog -Raw -ErrorAction SilentlyContinue) + (Get-Content -LiteralPath $javaStdout -Raw -ErrorAction SilentlyContinue)
-            if ($javaProcess.ExitCode -ne 0 -or $javaOutput -notmatch 'version "21\.') { return $false }
-        }
-        finally {
-            Remove-Item -LiteralPath $javaLog, $javaStdout -Force -ErrorAction SilentlyContinue
-        }
         return $true
     }
     finally {
@@ -103,13 +86,13 @@ try {
     }
 
     if (-not (Test-Runtime)) {
-        Write-Host "Preparing the private Python, Shapely, Osmium Tool and Java runtime..." -ForegroundColor Cyan
+        Write-Host "Preparing the private Python, Shapely and Osmium Tool runtime..." -ForegroundColor Cyan
         New-Item -ItemType Directory -Path $RuntimeRoot -Force | Out-Null
         if (Test-Path -LiteralPath (Join-Path $EnvPrefix "conda-meta")) {
-            Invoke-Checked $CondaExe @("install", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "pip", "tk", "osmium-tool", "openjdk=21") "Runtime repair"
+            Invoke-Checked $CondaExe @("install", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "pip", "tk", "osmium-tool") "Runtime repair"
         }
         else {
-            Invoke-Checked $CondaExe @("create", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "pip", "tk", "osmium-tool", "openjdk=21") "Runtime installation"
+            Invoke-Checked $CondaExe @("create", "--yes", "--prefix", $EnvPrefix, "--override-channels", "-c", "conda-forge", "python=3.12", "pip", "tk", "osmium-tool") "Runtime installation"
         }
     }
 
@@ -126,12 +109,6 @@ try {
         throw "The private runtime did not pass verification. Check the installation output above; the GUI was not started."
     }
 
-    Write-Host "Preparing and verifying JOSM..." -ForegroundColor Cyan
-    Invoke-Checked $PythonExe @((Join-Path $RepoRoot "setup_native.py"), "--gui-only") "JOSM setup"
-    if (-not (Test-Path -LiteralPath $JosmJar)) {
-        throw "JOSM setup finished without creating $JosmJar."
-    }
-
     Write-Host "All prerequisites are ready. Starting OSM QA Buddy..." -ForegroundColor Green
     Start-Process -FilePath $PythonwExe -ArgumentList ('"{0}"' -f (Join-Path $RepoRoot "OSM_QA_Buddy_GUI.pyw")) -WorkingDirectory $RepoRoot
     exit 0
@@ -141,7 +118,7 @@ catch {
     Write-Host "OSM QA Buddy could not finish setup:" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     Write-Host ""
-    Write-Host "No global Python, Java, or PATH settings were changed."
+    Write-Host "No global Python or PATH settings were changed."
     Read-Host "Press Enter to close this window"
     exit 1
 }

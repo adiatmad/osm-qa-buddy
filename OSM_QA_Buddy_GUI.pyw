@@ -23,7 +23,7 @@ from osmium_tool import OsmiumToolError, resolve_osmium
 REPO_DIR = Path(__file__).resolve().parent
 SESSION_FILE = REPO_DIR / ".gui_session.txt"
 RUNS_DIR = REPO_DIR / "gui_runs"
-JOSM_JAR = REPO_DIR / "tools" / "josm-19613.jar"
+JOSM_JAR = REPO_DIR / "tools" / "josm-tested.jar"
 
 
 def find_osmium() -> str | None:

@@ -278,13 +278,13 @@ class QABuddyApp(tk.Tk):
         self.status_var.set(f"QA run failed (exit code {code})")
         self._sync_output_buttons()
         details = log_widget.get("1.0", "end-1c").strip().splitlines()
-        tail = "\\n".join(details[-35:]) or "No pipeline output was captured."
+        tail = "\n".join(details[-35:]) or "No pipeline output was captured."
         output = self.latest_run.get("output", "")
         messagebox.showerror(
             "QA Buddy finalization failed",
-            f"Pipeline exited with code {code}.\\n\\n"
-            f"Output folder: {output}\\n\\n"
-            "The log below shows the most recent diagnostic lines. If report/map files were created before the failure, their buttons remain available.\\n\\n"
+            f"Pipeline exited with code {code}.\n\n"
+            f"Output folder: {output}\n\n"
+            "The log below shows the most recent diagnostic lines. If report/map files were created before the failure, their buttons remain available.\n\n"
             f"{tail}",
         )
 
@@ -412,14 +412,14 @@ class QABuddyApp(tk.Tk):
         if path.is_file():
             webbrowser.open(path.as_uri())
         else:
-            messagebox.showwarning("Report unavailable", f"The report was not created in the run folder:\\n{path.parent}")
+            messagebox.showwarning("Report unavailable", f"The report was not created in the run folder:\n{path.parent}")
 
     def open_map(self) -> None:
         path = Path(self.latest_run.get("output", "")) / "map.html"
         if path.is_file():
             webbrowser.open(path.as_uri())
         else:
-            messagebox.showwarning("Map unavailable", f"The map was not created in the run folder:\\n{path.parent}")
+            messagebox.showwarning("Map unavailable", f"The map was not created in the run folder:\n{path.parent}")
 
 
 if __name__ == "__main__":

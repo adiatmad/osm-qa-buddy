@@ -34,8 +34,10 @@ class OsmiumDiscoveryTests(unittest.TestCase):
     def test_discovers_active_conda_environment_without_path(self):
         executable = self._executable(self.root / "env" / "Library" / "bin" / "osmium.exe")
         with patch.dict(os.environ, {"CONDA_PREFIX": str(self.root / "env")}, clear=True), patch.object(
-            osmium_tool.shutil, "which", return_value=None
-        ), patch.object(osmium_tool.subprocess, "run", side_effect=self._success):
+            Path, "home", side_effect=RuntimeError("Could not determine home directory.")
+        ), patch.object(osmium_tool.shutil, "which", return_value=None), patch.object(
+            osmium_tool.subprocess, "run", side_effect=self._success
+        ):
             self.assertEqual(resolve_osmium(), str(executable.resolve()))
 
     def test_discovers_environment_under_conda_envs_path(self):

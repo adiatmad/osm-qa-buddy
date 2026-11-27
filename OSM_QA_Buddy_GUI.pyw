@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import shutil
 import sys
 import threading
 import webbrowser
@@ -22,6 +23,7 @@ from osmium_tool import OsmiumToolError, resolve_osmium
 REPO_DIR = Path(__file__).resolve().parent
 SESSION_FILE = REPO_DIR / ".gui_session.txt"
 RUNS_DIR = REPO_DIR / "gui_runs"
+JOSM_JAR = REPO_DIR / "tools" / "josm-19613.jar"
 
 
 def find_osmium() -> str | None:
@@ -252,7 +254,7 @@ class QABuddyApp(tk.Tk):
             text=(
                 f"{python_text}: {'OK' if python_ok() else 'Too old (need 3.12+)'}\n"
                 f"Osmium: {'Found' if osmium else 'Not found'}\n"
-                f"JOSM: opened through your Windows file association"
+                f"JOSM: {'Prepared locally' if JOSM_JAR.is_file() else 'Not prepared'}"
             )
         )
         if not python_ok():
@@ -348,11 +350,24 @@ class QABuddyApp(tk.Tk):
         if not sample.is_file():
             messagebox.showwarning("No sample", "Start a new QA run first.")
             return
+        java = shutil.which("javaw") or shutil.which("java")
+        if not java or not JOSM_JAR.is_file():
+            messagebox.showerror(
+                "JOSM is not ready",
+                "The bundled JOSM runtime or Java executable is missing. Close QA Buddy and click Launch_OSM_QA_Buddy.vbs to repair the installation.",
+            )
+            return
         try:
-            os.startfile(str(sample))  # type: ignore[attr-defined]
-            self.status_var.set("Opened sample.osm — validate it in JOSM")
+            subprocess.Popen(
+                [java, "-jar", str(JOSM_JAR), str(sample)],
+                cwd=str(REPO_DIR),
+                env=os.environ.copy(),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            self.status_var.set("Opened sample.osm in the bundled JOSM")
         except OSError as exc:
-            messagebox.showerror("Could not open sample", str(exc))
+            messagebox.showerror("Could not open JOSM", str(exc))
 
     def start_finalize(self) -> None:
         tasks = self.latest_run.get("tasks", "")
